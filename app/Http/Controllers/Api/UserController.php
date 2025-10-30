@@ -11,6 +11,7 @@ use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
 
 class UserController extends Controller
 {
@@ -19,31 +20,37 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
-        $search = $request->get('search');
+        $cacheKey = 'users:index:' . md5($request->fullUrl());
 
-        $query = User::with('roles')
-            ->where('is_admin', false);
+        $payload = Cache::tags(['users'])->remember($cacheKey, 300, function () use ($request) {
+            $perPage = $request->get('per_page', 15);
+            $search = $request->get('search');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
+            $query = User::with('roles')
+                ->where('is_admin', false);
 
-        $users = $query->latest()->paginate($perPage);
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => UserResource::collection($users),
-            'meta' => [
-                'current_page' => $users->currentPage(),
-                'last_page' => $users->lastPage(),
-                'per_page' => $users->perPage(),
-                'total' => $users->total(),
-            ],
-        ]);
+            $users = $query->latest()->paginate($perPage);
+
+            return [
+                'success' => true,
+                'data' => UserResource::collection($users),
+                'meta' => [
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total(),
+                ],
+            ];
+        });
+
+        return response()->json($payload);
     }
 
     /**
@@ -66,6 +73,9 @@ class UserController extends Controller
         // Log the creation
         AuditService::logCreate('User', $user->id, $user->toArray());
 
+        // Invalidate users cache
+        Cache::tags(['users'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'User created successfully',
@@ -78,12 +88,16 @@ class UserController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $user = User::with('roles.permissions')->findOrFail($id);
+        $cacheKey = "users:show:$id";
+        $payload = Cache::tags(['users'])->remember($cacheKey, 300, function () use ($id) {
+            $user = User::with('roles.permissions')->findOrFail($id);
+            return [
+                'success' => true,
+                'data' => new UserResource($user),
+            ];
+        });
 
-        return response()->json([
-            'success' => true,
-            'data' => new UserResource($user),
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -112,6 +126,9 @@ class UserController extends Controller
         // Log the update
         AuditService::logUpdate('User', $user->id, $oldValues, $user->toArray());
 
+        // Invalidate users cache
+        Cache::tags(['users'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
@@ -131,6 +148,9 @@ class UserController extends Controller
         AuditService::logDelete('User', $user->id, $oldValues);
 
         $user->delete();
+
+        // Invalidate users cache
+        Cache::tags(['users'])->flush();
 
         return response()->json([
             'success' => true,

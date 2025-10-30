@@ -11,6 +11,7 @@ use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
 
 class AdminController extends Controller
 {
@@ -19,31 +20,37 @@ class AdminController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
-        $search = $request->get('search');
+        $cacheKey = 'admins:index:' . md5($request->fullUrl());
 
-        $query = User::with('roles')
-            ->where('is_admin', true);
+        $payload = Cache::tags(['admins'])->remember($cacheKey, 300, function () use ($request) {
+            $perPage = $request->get('per_page', 15);
+            $search = $request->get('search');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
+            $query = User::with('roles')
+                ->where('is_admin', true);
 
-        $admins = $query->latest()->paginate($perPage);
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => UserResource::collection($admins),
-            'meta' => [
-                'current_page' => $admins->currentPage(),
-                'last_page' => $admins->lastPage(),
-                'per_page' => $admins->perPage(),
-                'total' => $admins->total(),
-            ],
-        ]);
+            $admins = $query->latest()->paginate($perPage);
+
+            return [
+                'success' => true,
+                'data' => UserResource::collection($admins),
+                'meta' => [
+                    'current_page' => $admins->currentPage(),
+                    'last_page' => $admins->lastPage(),
+                    'per_page' => $admins->perPage(),
+                    'total' => $admins->total(),
+                ],
+            ];
+        });
+
+        return response()->json($payload);
     }
 
     /**
@@ -67,6 +74,9 @@ class AdminController extends Controller
         // Log the creation
         AuditService::logCreate('Admin', $admin->id, $admin->toArray());
 
+        // Invalidate admins cache
+        Cache::tags(['admins'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Admin created successfully',
@@ -79,14 +89,18 @@ class AdminController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $admin = User::with('roles.permissions')
-            ->where('is_admin', true)
-            ->findOrFail($id);
+        $cacheKey = "admins:show:$id";
+        $payload = Cache::tags(['admins'])->remember($cacheKey, 300, function () use ($id) {
+            $admin = User::with('roles.permissions')
+                ->where('is_admin', true)
+                ->findOrFail($id);
+            return [
+                'success' => true,
+                'data' => new UserResource($admin),
+            ];
+        });
 
-        return response()->json([
-            'success' => true,
-            'data' => new UserResource($admin),
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -115,6 +129,9 @@ class AdminController extends Controller
         // Log the update
         AuditService::logUpdate('Admin', $admin->id, $oldValues, $admin->toArray());
 
+        // Invalidate admins cache
+        Cache::tags(['admins'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Admin updated successfully',
@@ -134,6 +151,9 @@ class AdminController extends Controller
         AuditService::logDelete('Admin', $admin->id, $oldValues);
 
         $admin->delete();
+
+        // Invalidate admins cache
+        Cache::tags(['admins'])->flush();
 
         return response()->json([
             'success' => true,

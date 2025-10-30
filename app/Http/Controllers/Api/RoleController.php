@@ -9,6 +9,7 @@ use App\Http\Resources\RoleResource;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -18,27 +19,33 @@ class RoleController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
-        $search = $request->get('search');
+        $cacheKey = 'roles:index:' . md5($request->fullUrl());
 
-        $query = Role::with('permissions');
+        $payload = Cache::tags(['roles'])->remember($cacheKey, 300, function () use ($request) {
+            $perPage = $request->get('per_page', 15);
+            $search = $request->get('search');
 
-        if ($search) {
-            $query->where('name', 'like', "%{$search}%");
-        }
+            $query = Role::with('permissions');
 
-        $roles = $query->latest()->paginate($perPage);
+            if ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => RoleResource::collection($roles),
-            'meta' => [
-                'current_page' => $roles->currentPage(),
-                'last_page' => $roles->lastPage(),
-                'per_page' => $roles->perPage(),
-                'total' => $roles->total(),
-            ],
-        ]);
+            $roles = $query->latest()->paginate($perPage);
+
+            return [
+                'success' => true,
+                'data' => RoleResource::collection($roles),
+                'meta' => [
+                    'current_page' => $roles->currentPage(),
+                    'last_page' => $roles->lastPage(),
+                    'per_page' => $roles->perPage(),
+                    'total' => $roles->total(),
+                ],
+            ];
+        });
+
+        return response()->json($payload);
     }
 
     /**
@@ -63,6 +70,9 @@ class RoleController extends Controller
         // Log the creation
         AuditService::logCreate('Role', $role->id, $role->toArray());
 
+        // Invalidate roles cache
+        Cache::tags(['roles'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Role created successfully',
@@ -75,12 +85,16 @@ class RoleController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $role = Role::with('permissions')->findOrFail($id);
+        $cacheKey = "roles:show:$id";
+        $payload = Cache::tags(['roles'])->remember($cacheKey, 300, function () use ($id) {
+            $role = Role::with('permissions')->findOrFail($id);
+            return [
+                'success' => true,
+                'data' => new RoleResource($role),
+            ];
+        });
 
-        return response()->json([
-            'success' => true,
-            'data' => new RoleResource($role),
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -108,6 +122,9 @@ class RoleController extends Controller
         // Log the update
         AuditService::logUpdate('Role', $role->id, $oldValues, $role->toArray());
 
+        // Invalidate roles cache
+        Cache::tags(['roles'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Role updated successfully',
@@ -127,6 +144,9 @@ class RoleController extends Controller
         AuditService::logDelete('Role', $role->id, $oldValues);
 
         $role->delete();
+
+        // Invalidate roles cache
+        Cache::tags(['roles'])->flush();
 
         return response()->json([
             'success' => true,

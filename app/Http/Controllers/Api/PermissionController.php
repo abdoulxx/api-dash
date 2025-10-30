@@ -8,6 +8,7 @@ use App\Http\Resources\PermissionResource;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
@@ -19,27 +20,33 @@ class PermissionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
-        $search = $request->get('search');
+        $cacheKey = 'permissions:index:' . md5($request->fullUrl());
 
-        $query = Permission::query();
+        $payload = Cache::tags(['permissions'])->remember($cacheKey, 300, function () use ($request) {
+            $perPage = $request->get('per_page', 15);
+            $search = $request->get('search');
 
-        if ($search) {
-            $query->where('name', 'like', "%{$search}%");
-        }
+            $query = Permission::query();
 
-        $permissions = $query->latest()->paginate($perPage);
+            if ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => PermissionResource::collection($permissions),
-            'meta' => [
-                'current_page' => $permissions->currentPage(),
-                'last_page' => $permissions->lastPage(),
-                'per_page' => $permissions->perPage(),
-                'total' => $permissions->total(),
-            ],
-        ]);
+            $permissions = $query->latest()->paginate($perPage);
+
+            return [
+                'success' => true,
+                'data' => PermissionResource::collection($permissions),
+                'meta' => [
+                    'current_page' => $permissions->currentPage(),
+                    'last_page' => $permissions->lastPage(),
+                    'per_page' => $permissions->perPage(),
+                    'total' => $permissions->total(),
+                ],
+            ];
+        });
+
+        return response()->json($payload);
     }
 
     /**
@@ -54,6 +61,10 @@ class PermissionController extends Controller
 
         // Log the permission assignment
         AuditService::logPermissionAssignment('Role', $role->id, $data['permissions']);
+
+        // Invalidate permissions/roles caches
+        Cache::tags(['permissions'])->flush();
+        Cache::tags(['roles'])->flush();
 
         return response()->json([
             'success' => true,
@@ -78,6 +89,10 @@ class PermissionController extends Controller
         // Log the permission assignment
         AuditService::logPermissionAssignment('User', $user->id, $data['permissions']);
 
+        // Invalidate permissions/users caches
+        Cache::tags(['permissions'])->flush();
+        Cache::tags(['users'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Permissions assigned to user successfully',
@@ -93,15 +108,19 @@ class PermissionController extends Controller
      */
     public function getRolePermissions(int $roleId): JsonResponse
     {
-        $role = Role::with('permissions')->findOrFail($roleId);
+        $cacheKey = "permissions:role:$roleId";
+        $payload = Cache::tags(['permissions', 'roles'])->remember($cacheKey, 300, function () use ($roleId) {
+            $role = Role::with('permissions')->findOrFail($roleId);
+            return [
+                'success' => true,
+                'data' => [
+                    'role' => $role->name,
+                    'permissions' => PermissionResource::collection($role->permissions),
+                ],
+            ];
+        });
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'role' => $role->name,
-                'permissions' => PermissionResource::collection($role->permissions),
-            ],
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -109,16 +128,20 @@ class PermissionController extends Controller
      */
     public function getUserPermissions(int $userId): JsonResponse
     {
-        $user = User::with('permissions', 'roles.permissions')->findOrFail($userId);
+        $cacheKey = "permissions:user:$userId";
+        $payload = Cache::tags(['permissions', 'users'])->remember($cacheKey, 300, function () use ($userId) {
+            $user = User::with('permissions', 'roles.permissions')->findOrFail($userId);
+            return [
+                'success' => true,
+                'data' => [
+                    'user' => $user->name,
+                    'direct_permissions' => PermissionResource::collection($user->permissions),
+                    'role_permissions' => PermissionResource::collection($user->getAllPermissions()),
+                ],
+            ];
+        });
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $user->name,
-                'direct_permissions' => PermissionResource::collection($user->permissions),
-                'role_permissions' => PermissionResource::collection($user->getAllPermissions()),
-            ],
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -139,6 +162,9 @@ class PermissionController extends Controller
         // Log the creation
         AuditService::logCreate('Permission', $permission->id, $permission->toArray());
 
+        // Invalidate permissions cache
+        Cache::tags(['permissions'])->flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Permission created successfully',
@@ -158,6 +184,9 @@ class PermissionController extends Controller
         AuditService::logDelete('Permission', $permission->id, $oldValues);
 
         $permission->delete();
+
+        // Invalidate permissions cache
+        Cache::tags(['permissions'])->flush();
 
         return response()->json([
             'success' => true,
