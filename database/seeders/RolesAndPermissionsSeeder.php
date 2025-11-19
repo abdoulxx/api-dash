@@ -96,8 +96,8 @@ class RolesAndPermissionsSeeder extends Seeder
         // Create a super admin user
         $superAdminUser = User::create([
             'name' => 'Super Admin',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('password'),
+            'email' => 'superadmin@s360.com',
+            'password' => bcrypt('0151516084'),
             'is_admin' => true,
             'is_active' => true,
         ]);
@@ -106,8 +106,8 @@ class RolesAndPermissionsSeeder extends Seeder
         // Create a regular admin user
         $adminUser = User::create([
             'name' => 'Admin User',
-            'email' => 'admin.user@example.com',
-            'password' => bcrypt('password'),
+            'email' => 'admin.user@s360.com',
+            'password' => bcrypt('0151516084'),
             'is_admin' => true,
             'is_active' => true,
         ]);
@@ -115,9 +115,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Create a regular user
         $regularUser = User::create([
-            'name' => 'Regular User',
-            'email' => 'user@example.com',
-            'password' => bcrypt('password'),
+            'name' => 'User test',
+            'email' => 'user@s360.com',
+            'password' => bcrypt('0151516084'),
             'is_admin' => false,
             'is_active' => true,
         ]);
@@ -126,8 +126,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->command->info('Roles and permissions seeded successfully!');
         $this->command->info('');
         $this->command->info('Test Users:');
-        $this->command->info('Super Admin: admin@example.com / password');
-        $this->command->info('Admin: admin.user@example.com / password');
-        $this->command->info('User: user@example.com / password');
+        $this->command->info('Super Admin: superadmin@s360.com / 0151516084');
+        $this->command->info('Admin: admin.user@s360.com / 0151516084');
+        $this->command->info('User: user@s360.com / 0151516084');
     }
 }
