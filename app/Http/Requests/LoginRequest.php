@@ -26,4 +26,19 @@ class LoginRequest extends FormRequest
             'password' => 'required|string|min:6',
         ];
     }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.required' => 'L\'email est requis.',
+            'email.email' => 'L\'email doit être valide.',
+            'password.required' => 'Le mot de passe est requis.',
+            'password.min' => 'Le mot de passe doit contenir au moins :min caractères.',
+        ];
+    }
 }

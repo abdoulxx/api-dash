@@ -28,14 +28,14 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid credentials',
+                'message' => 'Email ou mot de passe incorrect.',
             ], 401);
         }
 
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account is inactive',
+                'message' => 'Ce compte est désactivé.',
             ], 403);
         }
 
