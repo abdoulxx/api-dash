@@ -97,6 +97,20 @@ fi
 echo "🗄️  Running database migrations..."
 php artisan migrate --force || echo "⚠️  Migrations may have already been run"
 
+# Run seeders if users table is empty (first time only)
+echo "🌱 Checking if database needs seeding..."
+USER_COUNT=$(php artisan tinker --execute="echo \App\Models\User::count();" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || echo "0")
+if [ "$USER_COUNT" = "0" ]; then
+    echo "📊 Seeding database with initial data (roles, permissions, test users)..."
+    php artisan db:seed --force || echo "⚠️  Seeders may have already been run"
+    echo "✅ Database seeded! Test users created:"
+    echo "   - admin@example.com / password (Super Admin)"
+    echo "   - admin.user@example.com / password (Admin)"
+    echo "   - user@example.com / password (Viewer)"
+else
+    echo "✅ Database already contains data ($USER_COUNT users), skipping seeders"
+fi
+
 # Clear caches
 echo "🧹 Clearing caches..."
 php artisan config:clear || true
