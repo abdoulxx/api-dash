@@ -8,8 +8,8 @@ use App\Http\Resources\UserResource;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -27,32 +27,68 @@ class AuthController extends Controller
             AuditService::logLogin($credentials['email'], false);
 
             return response()->json([
-                'success' => false,
+                'status' => 401,
                 'message' => 'Invalid credentials',
             ], 401);
         }
 
         if (!$user->is_active) {
             return response()->json([
-                'success' => false,
+                'status' => 403,
                 'message' => 'Account is inactive',
             ], 403);
         }
 
-        // Create token
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Ensure user has only one active session at a time
+        $user->tokens()->delete();
+
+        // Generate tokens with length between 180 and 220 characters
+        $plainAccessToken = Str::random(rand(180, 220));
+        $plainRefreshToken = Str::random(rand(180, 220));
+
+        $user->tokens()->create([
+            'name' => 'access_token',
+            'token' => hash('sha256', $plainAccessToken),
+            'abilities' => ['access'],
+        ]);
+
+        $user->tokens()->create([
+            'name' => 'refresh_token',
+            'token' => hash('sha256', $plainRefreshToken),
+            'abilities' => ['refresh'],
+        ]);
+
+        // Update last login timestamp
+        $user->update(['last_login_at' => now()]);
 
         // Log successful login
         AuditService::logLogin($user->email, true);
 
+        $user->load('roles.permissions');
+
         return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'user' => new UserResource($user->load('roles')),
-                'token' => $token,
-                'token_type' => 'Bearer',
+            'status' => 200,
+            'refresh' => $plainRefreshToken,
+            'access' => $plainAccessToken,
+            'user' => [
+                'id' => $user->id,
+                'password' => $user->getAuthPassword(),
+                'is_superuser' => $user->hasRole('super-admin'),
+                'username' => $user->name,
+                'email' => $user->email,
+                'is_staff' => $user->is_admin,
+                'is_active' => $user->is_active,
+                'phone' => $user->phone,
+                'address' => $user->address,
+                'created_at' => optional($user->created_at)->toIso8601String(),
+                'updated_at' => optional($user->updated_at)->toIso8601String(),
+                'is_deleted' => (bool) $user->deleted_at,
+                'is_updated' => (bool) $user->updated_at,
+                'deleted_at' => $user->deleted_at,
+                'groups' => $user->roles->pluck('name'),
+                'user_permissions' => $user->getAllPermissions()->pluck('name'),
             ],
+            'message' => 'Connexion réussie !',
         ]);
     }
 
@@ -68,7 +104,7 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'message' => 'Logout successful',
         ]);
     }
@@ -81,7 +117,7 @@ class AuthController extends Controller
         $user = $request->user()->load('roles.permissions');
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => new UserResource($user),
         ]);
     }
@@ -93,17 +129,31 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // Revoke current token
-        $request->user()->currentAccessToken()->delete();
+        // Revoke current tokens
+        $user->tokens()->delete();
 
-        // Create new token
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Generate new tokens with length between 180 and 220 characters
+        $plainAccessToken = Str::random(rand(180, 220));
+        $plainRefreshToken = Str::random(rand(180, 220));
+
+        $user->tokens()->create([
+            'name' => 'access_token',
+            'token' => hash('sha256', $plainAccessToken),
+            'abilities' => ['access'],
+        ]);
+
+        $user->tokens()->create([
+            'name' => 'refresh_token',
+            'token' => hash('sha256', $plainRefreshToken),
+            'abilities' => ['refresh'],
+        ]);
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'message' => 'Token refreshed',
             'data' => [
-                'token' => $token,
+                'access' => $plainAccessToken,
+                'refresh' => $plainRefreshToken,
                 'token_type' => 'Bearer',
             ],
         ]);

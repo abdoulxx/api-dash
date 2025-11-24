@@ -1,0 +1,47 @@
+═══════════════════════════════════════════════════════════════════════════════
+  ENDPOINTS RECHERCHE AVANCÉE S360 - PRÊTS POUR TEST
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ TOUS LES ENDPOINTS SONT IMPLÉMENTÉS ET PRÊTS POUR TEST
+
+📋 ENDPOINTS DISPONIBLES :
+
+1. GET  /api/recherche/avancee/options
+   → Récupère les options de recherche disponibles
+
+2. POST /api/recherche/avancee
+   → Recherche avancée unifiée avec résultats multi-onglets
+   Body: { "option": "FDI|Importateur|Manifeste|RFCV|Declaration", "valeur": "...", "filters": {...}, "per_page": 15, "page": 1 }
+
+3. GET  /api/recherche/avancee/{option}/results
+   → Récupère les résultats par onglet spécifique
+   Params: ?tab=fdi_general|fdi_article|fcvr_general|fcvr_article|manifeste_general|manifeste_tt|manifeste_tc&valeur=...&per_page=15&page=1
+
+4. GET  /api/recherche/avancee/flow-diagram
+   → Génère le diagramme de flux des relations
+   Params: ?option=FDI&valeur=...
+
+5. GET  /api/recherche/avancee/navigate
+   → Navigation entre entités
+   Params: ?from=fdi&from_ulid=...&to=fcvr
+
+📄 FICHIER D'EXEMPLES POSTMAN :
+   → api-dash/EXEMPLES_POSTMAN_RECHERCHE_AVANCEE.md
+
+🔑 AUTHENTIFICATION REQUISE :
+   → Tous les endpoints nécessitent : Authorization: Bearer {{ACCESS_TOKEN}}
+
+📊 OPTIONS DE RECHERCHE :
+   - FDI
+   - Importateur
+   - Manifeste
+   - RFCV
+   - Declaration
+
+📑 ONGLETS DISPONIBLES :
+   - fdi_general, fdi_article
+   - fcvr_general, fcvr_article
+   - manifeste_general, manifeste_tt, manifeste_tc
+
+═══════════════════════════════════════════════════════════════════════════════
+

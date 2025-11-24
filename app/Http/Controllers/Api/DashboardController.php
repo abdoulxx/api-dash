@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\DeclarationSg;
+use App\Models\FcvrSg;
+use App\Models\FdiSg;
+use App\Models\ManifesteSg;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -28,11 +32,15 @@ class DashboardController extends Controller
                 'total_roles' => Role::count(),
                 'total_permissions' => Permission::count(),
                 'total_audit_logs' => AuditLog::count(),
+                'total_manifestes' => DB::table('manifeste_sg')->count(),
+                'total_fdi' => DB::table('fdi_sg')->count(),
+                'total_fcvr' => DB::table('fcvr_sg')->count(),
+                'total_declarations' => DB::table('declaration_sg')->count(),
             ];
         });
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => $stats,
         ]);
     }
@@ -51,7 +59,7 @@ class DashboardController extends Controller
         });
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => $recentLogs,
         ]);
     }
@@ -74,7 +82,7 @@ class DashboardController extends Controller
         });
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => $userGrowth,
         ]);
     }
@@ -92,7 +100,7 @@ class DashboardController extends Controller
         });
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => $actionStats,
         ]);
     }
@@ -120,8 +128,49 @@ class DashboardController extends Controller
         });
 
         return response()->json([
-            'success' => true,
+            'status' => 200,
             'data' => $topUsers,
+        ]);
+    }
+
+    public function zoneAlerte(): JsonResponse
+    {
+        $alerts = Cache::remember('dashboard:alerts', 300, function () {
+            return [
+                'manifeste_en_retard' => ManifesteSg::where('date_arrivee_navire', '<', now()->subDays(7))->count(),
+                'fdi_sans_validation' => FdiSg::whereNull('derniere_operation')->count(),
+                'declarations_sans_quittance' => DeclarationSg::whereNull('date_quittance')->count(),
+            ];
+        });
+
+        return response()->json([
+            'status' => 200,
+            'data' => $alerts,
+        ]);
+    }
+
+    public function delais(): JsonResponse
+    {
+        $delais = Cache::remember('dashboard:delais', 600, function () {
+            $driver = DB::getDriverName();
+
+            $fdiExpression = $driver === 'sqlite'
+                ? 'AVG(JULIANDAY(date_derniere_operation) - JULIANDAY(date_fdi))'
+                : 'AVG(EXTRACT(EPOCH FROM (date_derniere_operation - date_fdi)) / 86400)';
+
+            $declarationExpression = $driver === 'sqlite'
+                ? 'AVG(JULIANDAY(date_quittance) - JULIANDAY(date_declaration))'
+                : 'AVG(EXTRACT(EPOCH FROM (date_quittance - date_declaration)) / 86400)';
+
+            return [
+                'delai_moyen_fdi' => FdiSg::select(DB::raw($fdiExpression.' as moyenne'))->value('moyenne'),
+                'delai_moyen_declaration' => DeclarationSg::select(DB::raw($declarationExpression.' as moyenne'))->value('moyenne'),
+            ];
+        });
+
+        return response()->json([
+            'status' => 200,
+            'data' => $delais,
         ]);
     }
 }

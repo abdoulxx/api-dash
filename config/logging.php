@@ -123,6 +123,14 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'fdi' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/fdi.log'),
+            'level' => env('LOG_FDI_LEVEL', 'info'),
+            'days' => env('LOG_FDI_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

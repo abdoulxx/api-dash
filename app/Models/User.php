@@ -23,12 +23,20 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'firstname',
+        'lastname',
         'email',
         'password',
         'is_admin',
         'is_active',
         'phone',
         'address',
+        'fonction',
+        'departement',
+        'manager_id',
+        'statut',
+        'last_login_at',
+        'photo',
     ];
 
     /**
@@ -50,6 +58,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'is_active' => 'boolean',
@@ -62,5 +71,32 @@ class User extends Authenticatable
     public function auditLogs()
     {
         return $this->hasMany(AuditLog::class);
+    }
+
+    /**
+     * Get the manager of this user.
+     */
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    /**
+     * Get users managed by this user.
+     */
+    public function managedUsers()
+    {
+        return $this->hasMany(User::class, 'manager_id');
+    }
+
+    /**
+     * Get the full name attribute.
+     */
+    public function getFullNameAttribute(): string
+    {
+        if ($this->firstname && $this->lastname) {
+            return "{$this->firstname} {$this->lastname}";
+        }
+        return $this->name ?? $this->email;
     }
 }

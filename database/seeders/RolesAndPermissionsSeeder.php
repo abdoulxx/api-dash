@@ -93,15 +93,32 @@ class RolesAndPermissionsSeeder extends Seeder
             'view dashboard',
         ]);
 
-        // Create a super admin user
-        $superAdminUser = User::create([
-            'name' => 'Super Admin',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('password'),
-            'is_admin' => true,
-            'is_active' => true,
-        ]);
-        $superAdminUser->assignRole('super-admin');
+        // Create super admin users
+        $superAdmins = [
+            [
+                'name' => 'Super Admin',
+                'email' => 'admin@example.com',
+            ],
+            [
+                'name' => 'Super Admin 2',
+                'email' => 'admin2@example.com',
+            ],
+            [
+                'name' => 'Super Admin 3',
+                'email' => 'admin3@example.com',
+            ],
+        ];
+
+        foreach ($superAdmins as $data) {
+            $admin = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => bcrypt('password'),
+                'is_admin' => true,
+                'is_active' => true,
+            ]);
+            $admin->assignRole('super-admin');
+        }
 
         // Create a regular admin user
         $adminUser = User::create([
@@ -126,7 +143,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $this->command->info('Roles and permissions seeded successfully!');
         $this->command->info('');
         $this->command->info('Test Users:');
-        $this->command->info('Super Admin: admin@example.com / password');
+        $this->command->info('Super Admins: admin@example.com / password, admin2@example.com / password, admin3@example.com / password');
         $this->command->info('Admin: admin.user@example.com / password');
         $this->command->info('User: user@example.com / password');
     }

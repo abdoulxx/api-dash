@@ -1,0 +1,3698 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "S360°",
+        "description": "Documentation interactive de S360°, couvrant les modules migrés depuis S360.",
+        "contact": {
+            "name": "Équipe S360°",
+            "email": "support@s360.local"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost",
+            "description": "Instance actuelle (définie via L5_SWAGGER_CONST_HOST)"
+        },
+        {
+            "url": "/api"
+        }
+    ],
+    "paths": {
+        "/api/fdi/sg": {
+            "get": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Lister les FDI",
+                "operationId": "listFdiSg",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Recherche sur numero FDI, importateur ou fournisseur",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee des FDI",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Creer une FDI",
+                "operationId": "storeFdiSg",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "FDI creee",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}": {
+            "get": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Consulter une FDI",
+                "operationId": "showFdiSg",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "FDI detaillee",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "FDI introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Mettre a jour une FDI",
+                "operationId": "updateFdiSg",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "FDI mise a jour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Supprimer une FDI",
+                "operationId": "deleteFdiSg",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "FDI supprimee"
+                    },
+                    "404": {
+                        "description": "FDI introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/articles": {
+            "get": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Articles lies a une FDI",
+                "operationId": "fdiArticles",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des articles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/fcvr": {
+            "get": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "FCVR associee a une FDI",
+                "operationId": "fdiFcvr",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "FCVR associee",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/declarations": {
+            "get": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Declarations associees a une FDI",
+                "operationId": "fdiDeclarations",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des declarations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/compare": {
+            "post": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Comparer deux FDI",
+                "operationId": "compareFdi",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "secondary_ulid"
+                                ],
+                                "properties": {
+                                    "secondary_ulid": {
+                                        "description": "ULID de la FDI a comparer",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultat de la comparaison",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/validate": {
+            "post": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Declencher la validation asynchrone d'une FDI",
+                "operationId": "validateFdi",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Validation en file d'attente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/sg/{fdi_sg}/calculate-droits": {
+            "post": {
+                "tags": [
+                    "FDI SG"
+                ],
+                "summary": "Calculer les droits et taxes pour une FDI",
+                "operationId": "calculateFdiDroits",
+                "parameters": [
+                    {
+                        "name": "fdi_sg",
+                        "in": "path",
+                        "description": "Identifiant public (ULID) de la FDI",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Montants calcules",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg": {
+            "get": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Liste des manifestes SG",
+                "operationId": "listManifestesSg",
+                "parameters": [
+                    {
+                        "name": "code_bureau",
+                        "in": "query",
+                        "description": "Filtrer par code bureau",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "num_manifeste",
+                        "in": "query",
+                        "description": "Filtrer par numero de manifeste (recherche partielle)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'elements par page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee des manifestes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Creer un manifeste SG",
+                "operationId": "storeManifesteSg",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "instance_id",
+                                    "num_manifeste"
+                                ],
+                                "properties": {
+                                    "instance_id": {
+                                        "type": "integer"
+                                    },
+                                    "num_manifeste": {
+                                        "type": "string"
+                                    },
+                                    "code_bureau": {
+                                        "type": "string"
+                                    },
+                                    "date_arrivee": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Manifeste cree",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg/{manifeste}": {
+            "get": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Afficher un manifeste SG",
+                "operationId": "showManifesteSg",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "description": "Identifiant (id ou instance_id) du manifeste",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Manifeste trouve",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Manifeste introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Mettre a jour un manifeste SG",
+                "operationId": "updateManifesteSg",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Manifeste mis a jour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Manifeste introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Supprimer un manifeste SG",
+                "operationId": "deleteManifesteSg",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Manifeste supprime"
+                    },
+                    "404": {
+                        "description": "Manifeste introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg/{manifeste}/titres-transport": {
+            "get": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Lister les titres de transport d'un manifeste",
+                "operationId": "manifesteTitresTransport",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des titres de transport",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg/{manifeste}/conteneurs": {
+            "get": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Lister les conteneurs d'un manifeste",
+                "operationId": "manifesteConteneurs",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des conteneurs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg/{manifeste}/declarations": {
+            "get": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Lister les declarations associees a un manifeste",
+                "operationId": "manifesteDeclarations",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des declarations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/manifestes/sg/{manifeste}/validate": {
+            "post": {
+                "tags": [
+                    "Manifestes SG"
+                ],
+                "summary": "Valider la coherence d'un manifeste",
+                "operationId": "validateManifeste",
+                "parameters": [
+                    {
+                        "name": "manifeste",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resultat de la validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "valid": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/admins": {
+            "get": {
+                "tags": [
+                    "Administrateurs"
+                ],
+                "summary": "Lister les administrateurs",
+                "operationId": "2ce6a372e34e72ccd61364f1d1383abf",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Administrateurs"
+                ],
+                "summary": "Creer un administrateur",
+                "operationId": "b475edc35609009f309a8ec5024d0c5f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Administrateur cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/admins/{id}": {
+            "get": {
+                "tags": [
+                    "Administrateurs"
+                ],
+                "summary": "Afficher un administrateur",
+                "operationId": "9956fc96b571b638086033ea29639a6e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Administrateur"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Administrateurs"
+                ],
+                "summary": "Mettre a jour un administrateur",
+                "operationId": "df6904e8db351f3a4fe96aa4306ee4e8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Administrateur mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Administrateurs"
+                ],
+                "summary": "Supprimer un administrateur",
+                "operationId": "2ad01547adc147143531eab414af2eda",
+                "responses": {
+                    "204": {
+                        "description": "Administrateur supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/audit-logs": {
+            "get": {
+                "tags": [
+                    "Audit Logs"
+                ],
+                "summary": "Lister les journaux",
+                "operationId": "8382c5a77fa3961e6c88c04209404051",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/audit-logs/{id}": {
+            "get": {
+                "tags": [
+                    "Audit Logs"
+                ],
+                "summary": "Afficher un journal",
+                "operationId": "f7aa29feaa88de40387b9bbd4484806b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Journal detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/audit-logs/user/{userId}": {
+            "get": {
+                "tags": [
+                    "Audit Logs"
+                ],
+                "summary": "Journaux d'un utilisateur",
+                "operationId": "78093d72f31b1aef64327648df689eb6",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historique"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/audit-logs/model/{modelType}/{modelId}": {
+            "get": {
+                "tags": [
+                    "Audit Logs"
+                ],
+                "summary": "Journaux par modele",
+                "operationId": "3c5f19ce214f770b2b9ecb6079238425",
+                "parameters": [
+                    {
+                        "name": "modelType",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "modelId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historique filtre"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Connexion utilisateur",
+                "operationId": "e3e1332ef2ff28a1a9c0e42704f63f4c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authentification reussie"
+                    },
+                    "401": {
+                        "description": "Identifiants invalides"
+                    }
+                }
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Deconnexion",
+                "operationId": "fb7b4f3af451402c6433cd589dee3bc6",
+                "responses": {
+                    "204": {
+                        "description": "Deconnexion effectuee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Profil courant",
+                "operationId": "2730b63b59ce57b7df467b6384d44826",
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur courant"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Rafraichir le token",
+                "operationId": "c630b99f1c0a77db8748fc08bb018a40",
+                "responses": {
+                    "200": {
+                        "description": "Token rafraichi"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/sad": {
+            "get": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Lister les SAD",
+                "operationId": "0f0171aa464458665bba8388db1db81c",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Creer un SAD",
+                "operationId": "2b03d38542d5ea9e070c96d84166db43",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "SAD cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/sad/{id}": {
+            "get": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Afficher un SAD",
+                "operationId": "029c3c8954bac956678f3d7a29302a27",
+                "responses": {
+                    "200": {
+                        "description": "SAD detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Mettre a jour un SAD",
+                "operationId": "1b077c5ed5283e771c69428cb5776357",
+                "responses": {
+                    "200": {
+                        "description": "Mise a jour effectuee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Supprimer un SAD",
+                "operationId": "e94d1f5b229983dcda5eb62b27b1b22e",
+                "responses": {
+                    "204": {
+                        "description": "Suppression effectuee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/sad/{id}/declaration": {
+            "get": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Declaration associee",
+                "operationId": "1fb9d784efb85f5d634abdd38d86e7af",
+                "responses": {
+                    "200": {
+                        "description": "Rattachement declaration"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/sad/{id}/manifeste": {
+            "get": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Manifeste associe",
+                "operationId": "350dd9ceb377c28761a7f2ae89a9f260",
+                "responses": {
+                    "200": {
+                        "description": "Rattachement manifeste"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/sad/{id}/validate": {
+            "post": {
+                "tags": [
+                    "Banque SAD"
+                ],
+                "summary": "Valider un SAD",
+                "operationId": "622b02bf067808b9aa9bdc430868218e",
+                "responses": {
+                    "200": {
+                        "description": "Resultat de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf-comp-1": {
+            "get": {
+                "tags": [
+                    "Banque TVF Comp 1"
+                ],
+                "summary": "Lister les complements",
+                "operationId": "141d6b09847cd8d08d1aa74e530eafbf",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Banque TVF Comp 1"
+                ],
+                "summary": "Creer un complement",
+                "operationId": "2e53a4219bc28882c3fe083ff8c2ecf1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Enregistrement cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf-comp-1/{id}": {
+            "get": {
+                "tags": [
+                    "Banque TVF Comp 1"
+                ],
+                "summary": "Afficher un complement",
+                "operationId": "bdefdccb46d387ae408b18fae9486076",
+                "responses": {
+                    "200": {
+                        "description": "Details"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Banque TVF Comp 1"
+                ],
+                "summary": "Mettre a jour un complement",
+                "operationId": "657b624b5ead2c15897be459c4cef471",
+                "responses": {
+                    "200": {
+                        "description": "Mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Banque TVF Comp 1"
+                ],
+                "summary": "Supprimer un complement",
+                "operationId": "75e53de4bae28499417034c2ef1ada4b",
+                "responses": {
+                    "204": {
+                        "description": "Supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf-comp-2": {
+            "get": {
+                "tags": [
+                    "Banque TVF Comp 2"
+                ],
+                "summary": "Lister les complements",
+                "operationId": "3624d276bbaab72273260f45b1237c92",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Banque TVF Comp 2"
+                ],
+                "summary": "Creer un complement",
+                "operationId": "36a79986db45a120a213fa5114e365a1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Enregistrement cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf-comp-2/{id}": {
+            "get": {
+                "tags": [
+                    "Banque TVF Comp 2"
+                ],
+                "summary": "Afficher un complement",
+                "operationId": "f5f616f8e315b13e0d849795bffcf3b0",
+                "responses": {
+                    "200": {
+                        "description": "Details"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Banque TVF Comp 2"
+                ],
+                "summary": "Mettre a jour un complement",
+                "operationId": "e2a6aeea5c42832cd47928f1ab4da586",
+                "responses": {
+                    "200": {
+                        "description": "Mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Banque TVF Comp 2"
+                ],
+                "summary": "Supprimer un complement",
+                "operationId": "668f30acf51de33342d5f100e2eb7541",
+                "responses": {
+                    "204": {
+                        "description": "Supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf": {
+            "get": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Lister les TVF",
+                "operationId": "8dee4093e02a0d45c4304166a17e5c01",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Creer un TVF",
+                "operationId": "5bc85ce3cada408e593e06d23a947c8e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Enregistrement cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf/{id}": {
+            "get": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Afficher un TVF",
+                "operationId": "81ba51d5e986be1d9faf08c86fa0a193",
+                "responses": {
+                    "200": {
+                        "description": "Enregistrement"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Mettre a jour un TVF",
+                "operationId": "c789648eb0cfd50e2f2e6147b99c6fd8",
+                "responses": {
+                    "200": {
+                        "description": "Mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Supprimer un TVF",
+                "operationId": "7f1bd1256256b93f9e1d9d8d987189a3",
+                "responses": {
+                    "204": {
+                        "description": "Supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf/{id}/fdi": {
+            "get": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "FDI associee",
+                "operationId": "f1a63c9e8f4373d4a7357340030ea1ee",
+                "responses": {
+                    "200": {
+                        "description": "Details FDI"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf/{id}/comparaisons": {
+            "get": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Comparaisons associees",
+                "operationId": "875b02b46b2535aa865c103b0023daf2",
+                "responses": {
+                    "200": {
+                        "description": "Liste des comparaisons"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/banque/tvf/{id}/validate": {
+            "post": {
+                "tags": [
+                    "Banque TVF"
+                ],
+                "summary": "Valider un TVF",
+                "operationId": "a4bb70cbc6cb8629c691e3d45d5010ea",
+                "responses": {
+                    "200": {
+                        "description": "Resultat de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/articles": {
+            "get": {
+                "tags": [
+                    "Bons Provisoires Articles"
+                ],
+                "summary": "Lister les articles de bons",
+                "operationId": "a7bd3c86af504d6dff6e0bb54a658a66",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Bons Provisoires Articles"
+                ],
+                "summary": "Creer un article de bon",
+                "operationId": "48d17357f6cb1a69327ba3f5f06b6e3d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Article cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/articles/{id}": {
+            "get": {
+                "tags": [
+                    "Bons Provisoires Articles"
+                ],
+                "summary": "Afficher un article de bon",
+                "operationId": "0d9ff90065799a900ff0bb168439853e",
+                "responses": {
+                    "200": {
+                        "description": "Article detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Bons Provisoires Articles"
+                ],
+                "summary": "Mettre a jour un article de bon",
+                "operationId": "65c4067948ce37e422c4fdc558533d37",
+                "responses": {
+                    "200": {
+                        "description": "Mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Bons Provisoires Articles"
+                ],
+                "summary": "Supprimer un article de bon",
+                "operationId": "e6cfc5c2eaebfea46e7ca9645de0f314",
+                "responses": {
+                    "204": {
+                        "description": "Supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/sg": {
+            "get": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Lister les bons provisoires",
+                "operationId": "8ada42c019e01c1840f927abb8859b31",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Creer un bon provisoire",
+                "operationId": "1aa16a9b08dca3d8c818f908c19df950",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bon cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/sg/{id}": {
+            "get": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Afficher un bon provisoire",
+                "operationId": "175dde119162a0e0402a723adf5695fc",
+                "responses": {
+                    "200": {
+                        "description": "Details"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Mettre a jour un bon provisoire",
+                "operationId": "0f3852e0f4f864f900f6635575ed27ca",
+                "responses": {
+                    "200": {
+                        "description": "Mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Supprimer un bon provisoire",
+                "operationId": "5018cbebd5d9f21f88afefba32dbed8e",
+                "responses": {
+                    "204": {
+                        "description": "Supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/sg/{id}/articles": {
+            "get": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Articles lies",
+                "operationId": "5b5487eded2dad87363e3d7f55c629a5",
+                "responses": {
+                    "200": {
+                        "description": "Liste des articles"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/sg/{id}/validate": {
+            "post": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Valider un bon provisoire",
+                "operationId": "87a1b4b17786c9cb71fa7bf5abf2063d",
+                "responses": {
+                    "200": {
+                        "description": "Resultat validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/bons-provisoires/sg/{id}/expire": {
+            "post": {
+                "tags": [
+                    "Bons Provisoires SG"
+                ],
+                "summary": "Forcer l'expiration d'un bon provisoire",
+                "operationId": "7e0b6d20edea16f3d97857e5780d6f0e",
+                "responses": {
+                    "200": {
+                        "description": "Bon expire"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/fdi/{primary}/{secondary}": {
+            "get": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Comparer deux FDI",
+                "operationId": "db92184a32fdccefa7ee153c764b5381",
+                "responses": {
+                    "200": {
+                        "description": "Resultat de comparaison"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/fcvr/{fcvr}/{declaration}": {
+            "get": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Comparer une FCVR et une declaration",
+                "operationId": "021fa3081466f2913a108019d3a7f311",
+                "responses": {
+                    "200": {
+                        "description": "Ecarts detectes"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/manifeste/{manifeste}/{declaration}": {
+            "get": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Comparer manifeste et declaration",
+                "operationId": "f43b1dc4369e7de18830ff7925ddffaf",
+                "responses": {
+                    "200": {
+                        "description": "Ecarts detectes"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/banque/{banqueSad}/{declaration}": {
+            "get": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Comparer banque et declaration",
+                "operationId": "2f0ee4547bed21fb9f4a81680b9e4885",
+                "responses": {
+                    "200": {
+                        "description": "Ecarts detectes"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/dispatch": {
+            "post": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Planifier un controle asynchrone",
+                "operationId": "9633366a1d1440940692931c4867525e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Controle planifie"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/controle/result": {
+            "get": {
+                "tags": [
+                    "Controles"
+                ],
+                "summary": "Recuperer le dernier resultat en cache",
+                "operationId": "e0aef3bd1065355249e6872b35d88e06",
+                "responses": {
+                    "200": {
+                        "description": "Etat du controle"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Vue synthetique",
+                "operationId": "02804b90fcc7ea617e79975868a641fc",
+                "responses": {
+                    "200": {
+                        "description": "Indicateurs principaux"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/recent-activities": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Activites recentes",
+                "operationId": "f0ed92e649ef0d54caedd275ce2e0f34",
+                "responses": {
+                    "200": {
+                        "description": "Liste des activites"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/user-growth": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Croissance utilisateurs",
+                "operationId": "5cd2d153d0c3d6f426acf4e1f39a4c43",
+                "responses": {
+                    "200": {
+                        "description": "Donnees agregees"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/action-stats": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Statistiques d'actions",
+                "operationId": "e19194370af5599b17b7ba7b7f3af1e5",
+                "responses": {
+                    "200": {
+                        "description": "Donnees agregees"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/top-active-users": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Utilisateurs les plus actifs",
+                "operationId": "1982b489ddf7293e7b9fb9f850d00b92",
+                "responses": {
+                    "200": {
+                        "description": "Top utilisateurs"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/alerts": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Zone d'alerte",
+                "operationId": "1cc839d1748a7936a56c15430d93ff2e",
+                "responses": {
+                    "200": {
+                        "description": "Alertes en cours"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard/delais": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Suivi des delais",
+                "operationId": "0619dbc7c0f684ba324861dd152a1b82",
+                "responses": {
+                    "200": {
+                        "description": "Indicateurs de delai"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/articles": {
+            "get": {
+                "tags": [
+                    "Declarations Articles"
+                ],
+                "summary": "Lister les articles",
+                "operationId": "e0d2c11535a74c4ec4f01b28951a43b1",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Declarations Articles"
+                ],
+                "summary": "Creer un article",
+                "operationId": "a4670965bd43bae72ab56843df51a40e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Article cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/articles/{id}": {
+            "get": {
+                "tags": [
+                    "Declarations Articles"
+                ],
+                "summary": "Afficher un article",
+                "operationId": "61b365671447f992e3961a0ab9674ce5",
+                "responses": {
+                    "200": {
+                        "description": "Article detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Declarations Articles"
+                ],
+                "summary": "Mettre a jour un article",
+                "operationId": "c45152a81344db26196d205cebb7ac25",
+                "responses": {
+                    "200": {
+                        "description": "Article mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Declarations Articles"
+                ],
+                "summary": "Supprimer un article",
+                "operationId": "4d1404e8772b23f35cf758b1d93391aa",
+                "responses": {
+                    "204": {
+                        "description": "Article supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg": {
+            "get": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Lister les declarations",
+                "operationId": "ef27b58e93b242aaa80e5ead8fb53a83",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Creer une declaration",
+                "operationId": "1a8c81e3a80ccfc78214b4cf9fd7e482",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Declaration creee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}": {
+            "get": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Afficher une declaration",
+                "operationId": "772cad72c258b33645e62d009b737fc8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Declaration"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Mettre a jour une declaration",
+                "operationId": "9e8dfd07e1f3650fbf6d89c68b0dfe54",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Declaration mise a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Supprimer une declaration",
+                "operationId": "81f61ca561361d98919031f5a3c6fe85",
+                "responses": {
+                    "204": {
+                        "description": "Declaration supprimee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}/manifeste": {
+            "get": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Manifeste lie a une declaration",
+                "operationId": "fff3f7cc8c9b0363a3b6a4ef986598a2",
+                "responses": {
+                    "200": {
+                        "description": "Manifeste associe"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}/articles": {
+            "get": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Articles lies",
+                "operationId": "d248fe8fb3541bd27e215aa21f053251",
+                "responses": {
+                    "200": {
+                        "description": "Liste des articles"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}/conteneurs": {
+            "get": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Conteneurs lies",
+                "operationId": "b563bf8c4868a1db3edffce1c01fd91e",
+                "responses": {
+                    "200": {
+                        "description": "Liste des conteneurs"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}/validate": {
+            "post": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Valider la declaration",
+                "operationId": "45c5b604e31556712a63f5c5c5f092ba",
+                "responses": {
+                    "200": {
+                        "description": "Resultat de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/sg/{id}/calculate-taxes": {
+            "post": {
+                "tags": [
+                    "Declarations SG"
+                ],
+                "summary": "Calculer les taxes",
+                "operationId": "ba11ae122b8a8f7da59e28b1aa49d5a5",
+                "responses": {
+                    "200": {
+                        "description": "Montants calcules"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/tc": {
+            "get": {
+                "tags": [
+                    "Declarations TC"
+                ],
+                "summary": "Lister les enregistrements TC",
+                "operationId": "d1d273e6390495f8f2a5bb5a2e3379aa",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Declarations TC"
+                ],
+                "summary": "Creer un enregistrement TC",
+                "operationId": "7b08a78cd2a044a1166a693b59c2872a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Creation reussie"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/declarations/tc/{id}": {
+            "get": {
+                "tags": [
+                    "Declarations TC"
+                ],
+                "summary": "Afficher un enregistrement TC",
+                "operationId": "434e4c7ce09b4f3d305464d27e9e9b9b",
+                "responses": {
+                    "200": {
+                        "description": "Enregistrement detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Declarations TC"
+                ],
+                "summary": "Mettre a jour un enregistrement TC",
+                "operationId": "655ecd6d7903a61e805ada0302f1a5aa",
+                "responses": {
+                    "200": {
+                        "description": "Mise a jour effectuee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Declarations TC"
+                ],
+                "summary": "Supprimer un enregistrement TC",
+                "operationId": "3b5cb085058eb0f5214abd706e454b1e",
+                "responses": {
+                    "204": {
+                        "description": "Suppression effectuee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/export/excel": {
+            "post": {
+                "tags": [
+                    "Export"
+                ],
+                "summary": "Exporter en Excel",
+                "operationId": "58deff92a5791b962af99fe1669cd911",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Fichier Excel"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/export/pdf": {
+            "post": {
+                "tags": [
+                    "Export"
+                ],
+                "summary": "Exporter en PDF",
+                "operationId": "d8af949184d85bc03421162e63c3123a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Fichier PDF"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/export/xml": {
+            "post": {
+                "tags": [
+                    "Export"
+                ],
+                "summary": "Exporter en XML",
+                "operationId": "db50259ceb920113c3deef8e1afa8770",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Fichier XML"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/export/templates": {
+            "get": {
+                "tags": [
+                    "Export"
+                ],
+                "summary": "Recuperer les gabarits d'export",
+                "operationId": "fa19a0baf8ff1790e6a45edfa3745be6",
+                "responses": {
+                    "200": {
+                        "description": "Liste des gabarits"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/articles": {
+            "get": {
+                "tags": [
+                    "FDI Articles"
+                ],
+                "summary": "Lister les articles de FDI",
+                "operationId": "f099d4f506199de27e3967ec0ac0918a",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "FDI Articles"
+                ],
+                "summary": "Creer un article de FDI",
+                "operationId": "b24623c3b125152643749bf5242482ed",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Article cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/articles/{id}": {
+            "get": {
+                "tags": [
+                    "FDI Articles"
+                ],
+                "summary": "Afficher un article de FDI",
+                "operationId": "cdbf73e56d38e7d94c51aa306ccaeda7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Article detaille"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "FDI Articles"
+                ],
+                "summary": "Mettre a jour un article de FDI",
+                "operationId": "88488a41c054152456bef126585d76b8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Article mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "FDI Articles"
+                ],
+                "summary": "Supprimer un article de FDI",
+                "operationId": "e0ddb5131898420f28d11589c91635f2",
+                "responses": {
+                    "200": {
+                        "description": "Article supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/rech-comp": {
+            "get": {
+                "tags": [
+                    "FDI Comparaison"
+                ],
+                "summary": "Lister les entrees de comparaison FDI",
+                "operationId": "0d6a37207d654777802c2a5f90a35206",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "FDI Comparaison"
+                ],
+                "summary": "Creer une entree de comparaison",
+                "operationId": "9b84b1358270ab25851c9be572d68366",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Entree creee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/fdi/rech-comp/{id}": {
+            "get": {
+                "tags": [
+                    "FDI Comparaison"
+                ],
+                "summary": "Afficher une entree de comparaison",
+                "operationId": "fe3be7018f6acfa1a4dba48a067813df",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Entree detaillee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "FDI Comparaison"
+                ],
+                "summary": "Mettre a jour une entree de comparaison",
+                "operationId": "ea531283e2879468c22bc3ead2e97a47",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Entree mise a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "FDI Comparaison"
+                ],
+                "summary": "Supprimer une entree de comparaison",
+                "operationId": "519b396c685c3a4e3c9843751325eb70",
+                "responses": {
+                    "200": {
+                        "description": "Entree supprimee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/import/excel": {
+            "post": {
+                "tags": [
+                    "Import"
+                ],
+                "summary": "Importer un fichier Excel",
+                "operationId": "af96a16ead9410b58a9ef0d42c6ecfb4",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Import en file d'attente"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/import/csv": {
+            "post": {
+                "tags": [
+                    "Import"
+                ],
+                "summary": "Importer un fichier CSV",
+                "operationId": "eb46b3282cbdc3646e4aff2e5c46427b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Import en file d'attente"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions": {
+            "get": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Lister les permissions",
+                "operationId": "36c3d913c1dbebe412a736fb066c7f6e",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Creer une permission",
+                "operationId": "c04d530ba6ffaf1a10b12515bd363c54",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Permission creee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions/{id}": {
+            "delete": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Supprimer une permission",
+                "operationId": "5cc451ebba53c7008c7435cb02a2d229",
+                "responses": {
+                    "204": {
+                        "description": "Permission supprimee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions/roles/{roleId}/assign": {
+            "post": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Assigner des permissions a un role",
+                "operationId": "a6b58599d52e98e83a148f309e96e04b",
+                "parameters": [
+                    {
+                        "name": "roleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Permissions assignees"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions/roles/{roleId}": {
+            "get": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Permissions d'un role",
+                "operationId": "fed87e564da19dd9491cb2c56ba9fb4e",
+                "parameters": [
+                    {
+                        "name": "roleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des permissions"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions/users/{userId}/assign": {
+            "post": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Assigner des permissions a un utilisateur",
+                "operationId": "7b0a9765a8aa803c36cb834bca6c3536",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Permissions assignees"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/permissions/users/{userId}": {
+            "get": {
+                "tags": [
+                    "Permissions"
+                ],
+                "summary": "Permissions d'un utilisateur",
+                "operationId": "922d81c810a68d2134a1264d9a19f1ee",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des permissions"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/recherche/manifestes": {
+            "get": {
+                "tags": [
+                    "Recherche avancee"
+                ],
+                "summary": "Recherche sur manifestes",
+                "operationId": "84e0660ca90bdccc4a1096a5acbbe2e6",
+                "responses": {
+                    "200": {
+                        "description": "Resultats filtres"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/recherche/fdi": {
+            "get": {
+                "tags": [
+                    "Recherche avancee"
+                ],
+                "summary": "Recherche sur FDI",
+                "operationId": "cab7c0e37bf23db89cfe3a96db2c45ba",
+                "responses": {
+                    "200": {
+                        "description": "Resultats filtres"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/recherche/declarations": {
+            "get": {
+                "tags": [
+                    "Recherche avancee"
+                ],
+                "summary": "Recherche sur declarations",
+                "operationId": "5c442c90d544d86589ab5e8812446ec0",
+                "responses": {
+                    "200": {
+                        "description": "Resultats filtres"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/recherche/banque": {
+            "get": {
+                "tags": [
+                    "Recherche avancee"
+                ],
+                "summary": "Recherche sur banque",
+                "operationId": "268e6820982cf12ffa3c4447aaf8b9ce",
+                "responses": {
+                    "200": {
+                        "description": "Resultats filtres"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/roles": {
+            "get": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Lister les roles",
+                "operationId": "bb3492e7828a47733faac962bbe1d11a",
+                "responses": {
+                    "200": {
+                        "description": "Liste des roles"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Creer un role",
+                "operationId": "b9543b27687a7aae9a66011c2875773c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Role cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/roles/{id}": {
+            "get": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Afficher un role",
+                "operationId": "68140ed89abe42141c25f922256410de",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Mettre a jour un role",
+                "operationId": "2a9d19e7958fc1ad73be19bec4371117",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Role mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Supprimer un role",
+                "operationId": "8e08b8fb5d4b9ad7456af1b236afb27c",
+                "responses": {
+                    "204": {
+                        "description": "Role supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/users": {
+            "get": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Lister les utilisateurs",
+                "operationId": "19396232fc528e21365d111f6fb155da",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginee"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Creer un utilisateur",
+                "operationId": "2e1c8eb96981baecf72caa4512f02c4a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Utilisateur cree"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/users/{id}": {
+            "get": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Afficher un utilisateur",
+                "operationId": "eea5038ebe884f83af8c713ec8b54271",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Mettre a jour un utilisateur",
+                "operationId": "96972985598a0c7f5b9b2c7f97c4a4d7",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur mis a jour"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Supprimer un utilisateur",
+                "operationId": "3525aca6a6e188fbeccffe97c04d0cae",
+                "responses": {
+                    "204": {
+                        "description": "Utilisateur supprime"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "sanctum": {
+                "type": "http",
+                "description": "Utiliser un token d'accès généré via Sanctum.",
+                "bearerFormat": "Sanctum Token",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "FDI SG",
+            "description": "Gestion des fiches de dedouanement (FDI) segment SG."
+        },
+        {
+            "name": "Manifestes SG",
+            "description": "Gestion des manifestes du segment SG."
+        },
+        {
+            "name": "Administrateurs",
+            "description": "Gestion des comptes administrateurs."
+        },
+        {
+            "name": "Audit Logs",
+            "description": "Consultation des journaux d'audit."
+        },
+        {
+            "name": "Authentification",
+            "description": "Gestion des sessions et des tokens API."
+        },
+        {
+            "name": "Banque SAD",
+            "description": "Gestion des bordereaux SAD."
+        },
+        {
+            "name": "Banque TVF Comp 1",
+            "description": "Donnees complementaires TVF niveau 1."
+        },
+        {
+            "name": "Banque TVF Comp 2",
+            "description": "Donnees complementaires TVF niveau 2."
+        },
+        {
+            "name": "Banque TVF",
+            "description": "Gestion des transferts de valeurs financieres."
+        },
+        {
+            "name": "Bons Provisoires Articles",
+            "description": "Gestion des articles de bons provisoires."
+        },
+        {
+            "name": "Bons Provisoires SG",
+            "description": "Gestion des bons provisoires."
+        },
+        {
+            "name": "Controles",
+            "description": "Comparaisons et controles multi-sources."
+        },
+        {
+            "name": "Dashboard",
+            "description": "Indicateurs et metriques metier."
+        },
+        {
+            "name": "Declarations Articles",
+            "description": "Gestion des articles de declaration."
+        },
+        {
+            "name": "Declarations SG",
+            "description": "Gestion des declarations SG."
+        },
+        {
+            "name": "Declarations TC",
+            "description": "Gestion des declarations conteneurs."
+        },
+        {
+            "name": "Export",
+            "description": "Export de donnees metier."
+        },
+        {
+            "name": "FDI Articles",
+            "description": "Gestion des articles lies aux FDI."
+        },
+        {
+            "name": "FDI Comparaison",
+            "description": "Table de comparaison technique des FDI."
+        },
+        {
+            "name": "Import",
+            "description": "Import de jeux de donnees."
+        },
+        {
+            "name": "Permissions",
+            "description": "Gestion des permissions granulaire."
+        },
+        {
+            "name": "Recherche avancee",
+            "description": "Filtrage multi-criteres sur les modules migres."
+        },
+        {
+            "name": "Roles",
+            "description": "Gestion des roles et permissions."
+        },
+        {
+            "name": "Utilisateurs",
+            "description": "Gestion des utilisateurs applicatifs."
+        }
+    ]
+}

@@ -1,0 +1,239 @@
+{
+  "info": {
+    "name": "API Cache Management - S360",
+    "description": "Collection Postman pour gérer les caches de l'API S360",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "APP_URL",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "ACCESS_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "CACHE_KEY",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Cache - Liste Tous les Caches",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache?tag=&search=",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache"],
+          "query": [
+            {
+              "key": "tag",
+              "value": "",
+              "description": "Filtrer par tag (ex: fdi_sg)"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Rechercher dans les clés"
+            }
+          ]
+        },
+        "description": "Liste tous les caches disponibles. Utilisez les paramètres tag et search pour filtrer."
+      }
+    },
+    {
+      "name": "2. Cache - Caches par Tag FDI",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/tag/fdi_sg",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "tag", "fdi_sg"]
+        },
+        "description": "Liste tous les caches avec le tag 'fdi_sg'"
+      }
+    },
+    {
+      "name": "3. Cache - Caches par Tag Users",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/tag/users",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "tag", "users"]
+        },
+        "description": "Liste tous les caches avec le tag 'users'"
+      }
+    },
+    {
+      "name": "4. Cache - Caches par Tag Controles",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/tag/controles",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "tag", "controles"]
+        },
+        "description": "Liste tous les caches avec le tag 'controles'"
+      }
+    },
+    {
+      "name": "5. Cache - Statistiques",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/stats",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "stats"]
+        },
+        "description": "Affiche les statistiques du cache (nombre de clés, taille, répartition par tag)"
+      }
+    },
+    {
+      "name": "6. Cache - Détails par Clé",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/{{CACHE_KEY}}",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "{{CACHE_KEY}}"]
+        },
+        "description": "Affiche les détails d'un cache spécifique. Utilisez la variable {{CACHE_KEY}} ou remplacez par la clé complète."
+      }
+    },
+    {
+      "name": "7. Cache - Supprimer par Clé",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/{{CACHE_KEY}}",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "{{CACHE_KEY}}"]
+        },
+        "description": "Supprime un cache spécifique"
+      }
+    },
+    {
+      "name": "8. Cache - Flush par Tag FDI",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/tag/fdi_sg/flush",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "tag", "fdi_sg", "flush"]
+        },
+        "description": "Supprime tous les caches avec le tag 'fdi_sg'"
+      }
+    },
+    {
+      "name": "9. Cache - Flush Tout",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{APP_URL}}/api/cache/flush",
+          "host": ["{{APP_URL}}"],
+          "path": ["api", "cache", "flush"]
+        },
+        "description": "⚠️ Supprime TOUS les caches de l'application"
+      }
+    }
+  ]
+}
+
