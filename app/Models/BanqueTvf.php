@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BanqueTvf extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasPublicUlid;
 
     protected $table = 'banque_tvf';
 
@@ -51,6 +52,7 @@ class BanqueTvf extends Model
     ];
 
     protected $casts = [
+        'ulid' => 'string',
         'date_fdi' => 'datetime',
         'date_autorisation_fdi' => 'datetime',
         'date_expiration_fdi' => 'datetime',
@@ -67,11 +69,19 @@ class BanqueTvf extends Model
     ];
 
     /**
-     * Relation avec la FDI
+     * Accessor pour obtenir la FDI (avec conversion de type)
+     * Note: Conversion nécessaire car num_fdi est decimal et numero_fdi est string
      */
-    public function fdi()
+    public function getFdiAttribute()
     {
-        return $this->belongsTo(FdiSg::class, 'num_fdi', 'numero_fdi');
+        if (!isset($this->attributes['num_fdi']) || !$this->attributes['num_fdi']) {
+            return null;
+        }
+        
+        // Convertir num_fdi (decimal) en string pour la comparaison
+        $numFdiStr = (string) (int) $this->attributes['num_fdi'];
+        
+        return FdiSg::where('numero_fdi', $numFdiStr)->first();
     }
 
     /**

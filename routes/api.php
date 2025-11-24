@@ -305,20 +305,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}/force', [BanqueController::class, 'forceDelete'])->where('id', '[0-9A-Za-z]{26}');
         
         // Routes apiResource pour les banques
-        Route::apiResource('sad', BanqueSadController::class);
-        Route::apiResource('tvf', BanqueTvfController::class);
         Route::apiResource('tvf-comp-1', BanqueTvfComp1Controller::class);
         Route::apiResource('tvf-comp-2', BanqueTvfComp2Controller::class);
 
-        // Endpoints supplémentaires pour BanqueSad (doivent être après apiResource)
-        Route::get('sad/{banqueSad}/declaration', [BanqueSadController::class, 'declaration']);
-        Route::get('sad/{banqueSad}/manifeste', [BanqueSadController::class, 'manifeste']);
-        Route::post('sad/{banqueSad}/validate', [BanqueSadController::class, 'validate']);
+        // Routes SAD avec ULID (définies manuellement pour utiliser ULID au lieu de route model binding)
+        Route::get('sad', [BanqueSadController::class, 'index']);
+        Route::post('sad', [BanqueSadController::class, 'store']);
+        Route::get('sad/trashed', [BanqueSadController::class, 'trashed']);
+        Route::get('sad/{ulid}', [BanqueSadController::class, 'show'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::put('sad/{ulid}', [BanqueSadController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::patch('sad/{ulid}', [BanqueSadController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::delete('sad/{ulid}', [BanqueSadController::class, 'destroy'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::post('sad/{ulid}/restore', [BanqueSadController::class, 'restore'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::delete('sad/{ulid}/force', [BanqueSadController::class, 'forceDelete'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::get('sad/{ulid}/declaration', [BanqueSadController::class, 'declaration'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::get('sad/{ulid}/manifeste', [BanqueSadController::class, 'manifeste'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::match(['get', 'post'], 'sad/{ulid}/validate', [BanqueSadController::class, 'validate'])->where('ulid', '[0-9A-Za-z]{26}');
 
-        // Endpoints supplémentaires pour BanqueTvf (doivent être après apiResource)
-        Route::get('tvf/{banqueTvf}/fdi', [BanqueTvfController::class, 'fdi']);
-        Route::get('tvf/{banqueTvf}/comparaisons', [BanqueTvfController::class, 'comparaisons']);
-        Route::post('tvf/{banqueTvf}/validate', [BanqueTvfController::class, 'validate']);
+        // Routes TVF avec ULID (définies manuellement pour utiliser ULID au lieu de route model binding)
+        Route::get('tvf', [BanqueTvfController::class, 'index']);
+        Route::post('tvf', [BanqueTvfController::class, 'store']);
+        Route::get('tvf/trashed', [BanqueTvfController::class, 'trashed']);
+        Route::get('tvf/{ulid}', [BanqueTvfController::class, 'show'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::put('tvf/{ulid}', [BanqueTvfController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::patch('tvf/{ulid}', [BanqueTvfController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::delete('tvf/{ulid}', [BanqueTvfController::class, 'destroy'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::post('tvf/{ulid}/restore', [BanqueTvfController::class, 'restore'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::delete('tvf/{ulid}/force', [BanqueTvfController::class, 'forceDelete'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::get('tvf/{ulid}/fdi', [BanqueTvfController::class, 'fdi'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::get('tvf/{ulid}/comparaisons', [BanqueTvfController::class, 'comparaisons'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::match(['get', 'post'], 'tvf/{ulid}/validate', [BanqueTvfController::class, 'validate'])->where('ulid', '[0-9A-Za-z]{26}');
     });
 
     // ============================================

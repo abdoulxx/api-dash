@@ -36,7 +36,7 @@ class CacheController extends Controller
                 $keys = [];
                 if ($cachePrefix) {
                     $pattern = $cachePrefix . '*';
-                    $keys = $redis->keys($pattern);
+                $keys = $redis->keys($pattern);
                 }
                 
                 // Si aucune clé trouvée avec le préfixe, essayer toutes les clés
@@ -273,11 +273,11 @@ class CacheController extends Controller
         
         // Si pas trouvé, essayer avec Cache::get()
         if ($value === null) {
-            foreach ($keyVariations as $keyVariation) {
-                if (Cache::has($keyVariation)) {
-                    $value = Cache::get($keyVariation);
-                    $foundKey = $keyVariation;
-                    break;
+        foreach ($keyVariations as $keyVariation) {
+            if (Cache::has($keyVariation)) {
+                $value = Cache::get($keyVariation);
+                $foundKey = $keyVariation;
+                break;
                 }
             }
         }
@@ -343,7 +343,7 @@ class CacheController extends Controller
                                 $value = unserialize($rawValue);
                                 $foundKey = $redisKey;
                                 $ttl = $redis->ttl($redisKey);
-                                break;
+                        break;
                             }
                         } elseif ($type === 2) { // REDIS_SET = 2
                             // C'est un set (probablement un tag)
@@ -378,8 +378,8 @@ class CacheController extends Controller
                     $redisConnection = config('cache.stores.redis.connection', 'cache');
                     $redis = Redis::connection($redisConnection);
                     $testTtl = $redis->ttl($foundKey);
-                    if ($testTtl >= -1) {
-                        $ttl = $testTtl > 0 ? $testTtl : null;
+                        if ($testTtl >= -1) {
+                            $ttl = $testTtl > 0 ? $testTtl : null;
                     }
                 } catch (\Exception $e) {
                     // Ignorer l'erreur
@@ -949,14 +949,14 @@ class CacheController extends Controller
                     }
                     
                     if ($value !== null) {
-                        $size = strlen(serialize($value));
-                        $stats['total_size'] += $size;
-                        
-                        // Extraire le tag de la clé
+                    $size = strlen(serialize($value));
+                    $stats['total_size'] += $size;
+                    
+                    // Extraire le tag de la clé
                         foreach ($allTags as $tag) {
                             if (str_contains($actualKey, $tag)) {
-                                $stats['by_tag'][$tag] = ($stats['by_tag'][$tag] ?? 0) + 1;
-                                break;
+                            $stats['by_tag'][$tag] = ($stats['by_tag'][$tag] ?? 0) + 1;
+                            break;
                             }
                         }
                     }
@@ -969,14 +969,14 @@ class CacheController extends Controller
         } else {
             // Database cache
             try {
-                $cacheEntries = DB::table('cache')->get();
-                $stats['total_keys'] = $cacheEntries->count();
-                
-                foreach ($cacheEntries as $entry) {
-                    $stats['total_size'] += strlen($entry->value ?? '');
-                }
-                
-                $stats['total_size_formatted'] = $this->formatBytes($stats['total_size']);
+            $cacheEntries = DB::table('cache')->get();
+            $stats['total_keys'] = $cacheEntries->count();
+            
+            foreach ($cacheEntries as $entry) {
+                $stats['total_size'] += strlen($entry->value ?? '');
+            }
+            
+            $stats['total_size_formatted'] = $this->formatBytes($stats['total_size']);
             } catch (\Exception $e) {
                 $stats['error'] = 'Impossible de récupérer les statistiques: ' . $e->getMessage();
             }

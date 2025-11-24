@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BanqueSad extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasPublicUlid;
 
     protected $table = 'banque_sad';
 
@@ -58,6 +59,7 @@ class BanqueSad extends Model
     ];
 
     protected $casts = [
+        'ulid' => 'string',
         'date_ddu' => 'datetime',
         'date_dem_ac' => 'datetime',
         'date_dom' => 'datetime',
