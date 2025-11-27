@@ -32,8 +32,23 @@ class ControleControllerTest extends TestCase
 
         $this->getJson("/api/controle/fdi/{$primary->ulid}/{$secondary->ulid}")
             ->assertOk()
+            ->assertJsonFragment(['status' => 200])
             ->assertJsonFragment(['type' => 'fdi_compare'])
-            ->assertJsonStructure(['differences' => ['banque', 'montant_domicilie_cfa']]);
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    'type',
+                    'primaire' => ['numero_fdi_complet'],
+                    'secondaire' => ['numero_fdi_complet'],
+                    'diffs',
+                    'context_diffs',
+                    'summary' => [
+                        'total_financial_diffs',
+                        'total_context_diffs',
+                        'has_diffs',
+                    ],
+                ],
+            ]);
     }
 
     public function test_it_dispatches_process_controle_job(): void

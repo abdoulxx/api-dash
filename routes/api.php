@@ -142,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Désactiver le route model binding pour ces routes en utilisant ->where()
     Route::get('users/{id}/activity-history', [UserController::class, 'activityHistory'])->where('id', '[0-9A-Za-z]{26}');
     Route::get('users/{id}/statistics', [UserController::class, 'getStatistics'])->where('id', '[0-9A-Za-z]{26}');
+    Route::get('users/{id}/photo', [UserController::class, 'getPhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::post('users/{id}/photo', [UserController::class, 'uploadPhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::delete('users/{id}/photo', [UserController::class, 'deletePhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::post('users/{id}/restore', [UserController::class, 'restore'])->where('id', '[0-9A-Za-z]{26}');
@@ -157,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Routes avec paramètre {id} - doivent être avant apiResource
     // Utiliser {id} au lieu de {admin} pour éviter le route model binding automatique
     // Désactiver le route model binding pour ces routes en utilisant ->where()
+    Route::get('admins/{id}/photo', [AdminController::class, 'getPhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::post('admins/{id}/photo', [AdminController::class, 'uploadPhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::delete('admins/{id}/photo', [AdminController::class, 'deletePhoto'])->where('id', '[0-9A-Za-z]{26}');
     Route::post('admins/{id}/restore', [AdminController::class, 'restore'])->where('id', '[0-9A-Za-z]{26}');
@@ -249,7 +251,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('sg/{fdiSg}/declarations', [FdiSgController::class, 'declarations']);
         Route::post('sg/{fdiSg}/compare', [FdiSgController::class, 'compare']);
         Route::post('sg/{fdiSg}/validate', [FdiSgController::class, 'validateFdi']);
+        Route::get('sg/{fdiSg}/validate/result', [FdiSgController::class, 'validateResult']);
         Route::post('sg/{fdiSg}/calculate-droits', [FdiSgController::class, 'calculateDroits']);
+        Route::post('sg/{ulid}/restore', [FdiSgController::class, 'restore'])->where('ulid', '[0-9A-Za-z]{26}');
     });
 
     // ============================================
@@ -274,19 +278,28 @@ Route::middleware('auth:sanctum')->group(function () {
     // MODULE 4 : GESTION DES DÉCLARATIONS
     // ============================================
     Route::prefix('declarations')->group(function () {
-        // Routes apiResource pour les déclarations
-        Route::apiResource('sg', DeclarationSgController::class);
-        Route::apiResource('articles', DeclarationArticleController::class);
-        Route::apiResource('tc', DeclarationTcController::class);
-
-        // Endpoints supplémentaires pour DeclarationSg (doivent être après apiResource)
-        // Utiliser {ulid} pour les routes spécifiques pour éviter les conflits avec apiResource
+        // Routes pour DeclarationSg avec ULID (définies manuellement pour utiliser ULID au lieu de route model binding)
+        // IMPORTANT: Les routes spécifiques doivent être définies AVANT les routes avec paramètres dynamiques
+        Route::get('sg', [DeclarationSgController::class, 'index']);
+        Route::post('sg', [DeclarationSgController::class, 'store']);
+        Route::get('sg/calculate-taxes/result', [DeclarationSgController::class, 'calculateTaxesResult']);
+        
+        // Routes avec paramètre {ulid} - doivent être après les routes spécifiques
+        Route::get('sg/{ulid}', [DeclarationSgController::class, 'show'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::put('sg/{ulid}', [DeclarationSgController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::patch('sg/{ulid}', [DeclarationSgController::class, 'update'])->where('ulid', '[0-9A-Za-z]{26}');
+        Route::delete('sg/{ulid}', [DeclarationSgController::class, 'destroy'])->where('ulid', '[0-9A-Za-z]{26}');
+        
+        // Endpoints supplémentaires pour DeclarationSg avec {ulid}
         Route::get('sg/{ulid}/manifeste', [DeclarationSgController::class, 'manifeste'])->where('ulid', '[0-9A-Za-z]{26}');
         Route::get('sg/{ulid}/articles', [DeclarationSgController::class, 'articles'])->where('ulid', '[0-9A-Za-z]{26}');
         Route::get('sg/{ulid}/conteneurs', [DeclarationSgController::class, 'conteneurs'])->where('ulid', '[0-9A-Za-z]{26}');
         Route::post('sg/{ulid}/validate', [DeclarationSgController::class, 'validate'])->where('ulid', '[0-9A-Za-z]{26}');
         Route::post('sg/{ulid}/calculate-taxes', [DeclarationSgController::class, 'calculateTaxes'])->where('ulid', '[0-9A-Za-z]{26}');
-        Route::get('sg/calculate-taxes/result', [DeclarationSgController::class, 'calculateTaxesResult']);
+        
+        // Routes apiResource pour les autres ressources
+        Route::apiResource('articles', DeclarationArticleController::class);
+        Route::apiResource('tc', DeclarationTcController::class);
     });
 
     // ============================================
@@ -305,7 +318,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}/force', [BanqueController::class, 'forceDelete'])->where('id', '[0-9A-Za-z]{26}');
         
         // Routes apiResource pour les banques
+        Route::post('tvf-comp-1/{tvf_comp_1}/restore', [BanqueTvfComp1Controller::class, 'restore']);
         Route::apiResource('tvf-comp-1', BanqueTvfComp1Controller::class);
+        Route::post('tvf-comp-2/{identifier}/restore', [BanqueTvfComp2Controller::class, 'restore'])->where('identifier', '[0-9A-Za-z]{26}|[0-9]+|.+');
         Route::apiResource('tvf-comp-2', BanqueTvfComp2Controller::class);
 
         // Routes SAD avec ULID (définies manuellement pour utiliser ULID au lieu de route model binding)
@@ -364,10 +379,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // MODULE 7 : CONTRÔLES ET COMPARAISONS
     // ============================================
     Route::prefix('controle')->group(function () {
-        Route::get('fdi/{primary}/{secondary}', [ControleController::class, 'compareFdi']);
-        Route::get('fcvr/{fcvr}/{declaration}', [ControleController::class, 'compareFcvr']);
-        Route::get('manifeste/{manifeste}/{declaration}', [ControleController::class, 'compareManifeste']);
-        Route::get('banque/{banqueSad}/{declaration}', [ControleController::class, 'compareBanque']);
+        Route::get('fdi/{primary}/{secondary}', [ControleController::class, 'compareFdi'])
+            ->where('primary', '[0-9A-Za-z]{26}')
+            ->where('secondary', '[0-9A-Za-z]{26}');
+        Route::get('fcvr/{fcvr}/{declaration}', [ControleController::class, 'compareFcvr'])
+            ->where('fcvr', '[0-9A-Za-z]{26}')
+            ->where('declaration', '[0-9A-Za-z]{26}');
+        Route::get('manifeste/{manifeste}/{declaration}', [ControleController::class, 'compareManifeste'])
+            ->where('manifeste', '[0-9A-Za-z]{26}')
+            ->where('declaration', '[0-9A-Za-z]{26}');
+        Route::get('banque/{banqueSad}/{declaration}', [ControleController::class, 'compareBanque'])
+            ->where('banqueSad', '[0-9A-Za-z]{26}')
+            ->where('declaration', '[0-9A-Za-z]{26}');
         Route::post('dispatch', [ControleController::class, 'dispatch']);
         Route::get('result', [ControleController::class, 'result']);
     });

@@ -201,3 +201,9 @@ class DeclarationSgSeeder extends Seeder
         $this->command->info('1 déclaration de test créée');
     }
 }
+
+
+
+
+
+

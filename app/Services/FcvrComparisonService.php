@@ -44,7 +44,9 @@ class FcvrComparisonService
             $details = 'Valeurs identiques';
         } else {
             $status = 'danger';
-            $details = 'Valeurs différentes entre FCVR et déclaration';
+            $fcvrDisplay = $fcvrValue ?? '(vide)';
+            $declDisplay = $declarationValue ?? '(vide)';
+            $details = sprintf('Valeurs différentes : FCVR = "%s", Déclaration = "%s"', $fcvrDisplay, $declDisplay);
         }
 
         return [
@@ -53,7 +55,10 @@ class FcvrComparisonService
             'type' => 'string',
             'fcvr_value' => $fcvrValue,
             'declaration_value' => $declarationValue,
-            'difference' => $fcvrValue === $declarationValue ? null : [$fcvrValue, $declarationValue],
+            'difference' => $fcvrValue === $declarationValue ? null : [
+                'fcvr' => $fcvrValue,
+                'declaration' => $declarationValue,
+            ],
             'status' => $status,
             'details' => $details,
         ];
@@ -84,19 +89,19 @@ class FcvrComparisonService
                 $difference = 0.0;
             } else {
                 $baseline = $declarationValue != 0 ? (float) $declarationValue : ((float) $fcvrValue ?: 1);
-                $percentage = abs($difference) / abs($baseline);
+                $percentage = abs($difference) / abs($baseline) * 100;
 
                 $isWarning = ($warningAbsolute > 0 && abs($difference) <= $warningAbsolute)
-                    || ($warningPercentage > 0 && $percentage <= $warningPercentage);
+                    || ($warningPercentage > 0 && $percentage <= ($warningPercentage * 100));
 
                 $status = $isWarning ? 'warning' : 'danger';
                 $details = $status === 'warning'
-                    ? 'Écart faible détecté'
-                    : 'Écart important détecté';
+                    ? sprintf('Écart faible détecté (%.2f%%)', $percentage)
+                    : sprintf('Écart important détecté (%.2f%%)', $percentage);
             }
         }
 
-        return [
+        $result = [
             'key' => $key,
             'label' => $label,
             'type' => 'numeric',
@@ -107,6 +112,14 @@ class FcvrComparisonService
             'status' => $status,
             'details' => $details,
         ];
+
+        if ($difference !== null && $status !== 'ok') {
+            $baseline = $declarationValue != 0 ? (float) $declarationValue : ((float) $fcvrValue ?: 1);
+            $percentage = abs($difference) / abs($baseline) * 100;
+            $result['difference_percentage'] = round($percentage, 2);
+        }
+
+        return $result;
     }
 
     private function summarize(array $comparisons): array
@@ -126,6 +139,14 @@ class FcvrComparisonService
             }
         }
 
+        $totalValid = $summary['total'] - $summary['unknown'];
+        $summary['completion_rate'] = $totalValid > 0
+            ? round(($summary['ok'] / $totalValid) * 100, 2)
+            : 0;
+
+        $summary['has_blocking_issues'] = $summary['danger'] > 0;
+        $summary['has_warnings'] = $summary['warning'] > 0;
+
         return $summary;
     }
 
@@ -134,6 +155,11 @@ class FcvrComparisonService
         return [
             'id' => $fcvr->id,
             'ulid' => $fcvr->ulid,
+            'identifiant' => $fcvr->identifiant,
+            'numero_fcvr_complet' => $fcvr->numero_fcvr_complet,
+            'annee' => $fcvr->annee,
+            'bureau' => $fcvr->bureau,
+            'sequence' => $fcvr->num_rfcv,
             'instanceid' => $fcvr->instanceid,
             'num_tt' => $fcvr->num_tt,
             'num_rfcv' => $fcvr->num_rfcv,
@@ -146,9 +172,12 @@ class FcvrComparisonService
             'poids_brut_total' => $fcvr->poids_brut_total,
             'fob_rfcv_cfa' => $fcvr->fob_rfcv_cfa,
             'caf_rfcv' => $fcvr->caf_rfcv,
+            'caf_rfcv_cfa' => $fcvr->caf_rfcv_cfa,
             'code_declarant' => $fcvr->code_declarant,
             'nom_importateur' => $fcvr->nom_importateur,
             'nom_fournisseur' => $fcvr->nom_fournisseur,
+            'devise' => $fcvr->devise,
+            'taux_devise' => $fcvr->taux_devise,
         ];
     }
 
@@ -157,10 +186,15 @@ class FcvrComparisonService
         return [
             'id' => $declaration->id,
             'ulid' => $declaration->ulid,
+            'identifiant' => $declaration->identifiant,
             'instanceid' => $declaration->instanceid,
             'declaration' => $declaration->declaration,
+            'annee' => $declaration->annee,
+            'bureau' => $declaration->bureau,
+            'nom_bureau' => $declaration->nom_bureau,
             'num_bl' => $declaration->num_bl,
             'num_fdi' => $declaration->num_fdi,
+            'num_manifeste' => $declaration->num_manifeste,
             'date_declaration' => optional($declaration->date_declaration)->toIso8601String(),
             'nbre_colis' => $declaration->nbre_colis,
             'poids_brut_declaration' => $declaration->poids_brut_declaration,
@@ -169,8 +203,16 @@ class FcvrComparisonService
             'codagr' => $declaration->codagr,
             'importateur' => $declaration->importateur,
             'exportateur' => $declaration->exportateur,
+            'devise' => $declaration->devise,
+            'taux_conversion' => $declaration->taux_conversion,
         ];
     }
 }
+
+
+
+
+
+
 
 

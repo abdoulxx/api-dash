@@ -14,47 +14,96 @@ class FcvrArticleController extends Controller
     {
         $perPage = min($request->integer('per_page', 15), 100);
         $search = $request->string('search')->toString();
+        $page = $request->integer('page', 1);
 
-        $cacheKey = sprintf('fcvr_article.index.%s.%s', $request->get('page', 1), md5($search.$perPage));
+        $cacheKey = sprintf('fcvr_article.index.%s.%s', $page, md5($search.$perPage));
 
-        $data = CacheTagger::tags(['fcvr_article'])->remember($cacheKey, 300, function () use ($search, $perPage) {
-            $query = FcvrArticle::query();
+        $payload = CacheTagger::tags(['fcvr_article'])->remember($cacheKey, 300, function () use ($search, $perPage, $page) {
+            $query = FcvrArticle::query()->with('fcvr');
 
             if ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('numero_article', 'like', "%{$search}%")
-                      ->orWhere('designation', 'like', "%{$search}%");
+                    $q->where('num_article', 'like', "%{$search}%")
+                        ->orWhere('sh_rfcv', 'like', "%{$search}%")
+                        ->orWhere('libelle_sh_rfcv', 'like', "%{$search}%")
+                        ->orWhere('num_rfcv', 'like', "%{$search}%");
                 });
             }
 
-            $articles = $query->latest()->paginate($perPage);
+            $paginator = $query->latest()->paginate($perPage, ['*'], 'page', $page);
+
+            $items = $paginator->getCollection()
+                ->map(function (FcvrArticle $article) {
+                    $data = $article->toArray();
+                    $fcvr = $article->fcvr;
+                    $data['fcvr_identifiant'] = $fcvr?->identifiant;
+                    $data['numero_fcvr_complet'] = $fcvr?->numero_fcvr_complet;
+                    $data['message_resume'] = sprintf(
+                        '%s | Article #%s | SH %s | Quantité : %s %s | CAF article : %s',
+                        $fcvr?->identifiant ?? $article->num_rfcv ?? 'FCVR inconnue',
+                        $article->num_article ?? 'N/A',
+                        $article->sh_rfcv ?? 'N/A',
+                        $article->quantite_article ?? '0',
+                        $article->unite_quantite ?? '',
+                        $article->caf_article ?? $article->caf_declaree ?? '0'
+                    );
+                    return $data;
+                })
+                ->values()
+                ->toArray();
+
+            $lastPage = max($paginator->lastPage(), 1);
+            $message = $paginator->total() > 0
+                ? ($search
+                    ? sprintf('Recherche "%s" : %d article(s) FCVR. Page %d/%d', $search, $paginator->total(), $paginator->currentPage(), $lastPage)
+                    : sprintf('Liste des articles FCVR : %d enregistrement(s). Page %d/%d', $paginator->total(), $paginator->currentPage(), $lastPage))
+                : ($search
+                    ? sprintf('Aucun article ne correspond à "%s". Essayez avec un numéro FCVR, article ou SH', $search)
+                    : 'Aucun article FCVR enregistré.');
 
             return [
                 'status' => 200,
-                'data' => $articles->items(),
+                'message' => $message,
+                'data' => $items,
                 'meta' => [
-                    'current_page' => $articles->currentPage(),
-                    'last_page' => $articles->lastPage(),
-                    'per_page' => $articles->perPage(),
-                    'total' => $articles->total(),
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+                'links' => [
+                    'first' => $paginator->url(1),
+                    'last' => $paginator->url($paginator->lastPage()),
+                    'prev' => $paginator->previousPageUrl(),
+                    'next' => $paginator->nextPageUrl(),
                 ],
             ];
         });
 
-        return response()->json($data);
+        return response()->json($payload);
     }
 
     public function store(Request $request): JsonResponse
     {
-        $article = FcvrArticle::create($request->all());
+        $payload = $request->all();
+        $article = FcvrArticle::create($payload);
         $article->refresh();
 
         CacheTagger::tags(['fcvr_article'])->flush();
 
+        $data = $article->toArray();
+        $fcvr = $article->fcvr;
+        $data['fcvr_identifiant'] = $fcvr?->identifiant;
+        $data['numero_fcvr_complet'] = $fcvr?->numero_fcvr_complet;
+
         return response()->json([
             'status' => 201,
-            'message' => 'Article FCVR créé avec succès',
-            'data' => $article->toArray(),
+            'message' => sprintf(
+                "Article #%s ajouté à la FCVR \"%s\"",
+                $article->num_article ?? $article->id,
+                $fcvr?->identifiant ?? $article->num_rfcv ?? 'FCVR inconnue'
+            ),
+            'data' => $data,
         ], 201);
     }
 
@@ -92,5 +141,11 @@ class FcvrArticleController extends Controller
         ]);
     }
 }
+
+
+
+
+
+
 
 

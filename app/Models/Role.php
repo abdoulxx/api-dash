@@ -9,6 +9,14 @@ class Role extends SpatieRole
 {
     use SoftDeletes;
 
-    protected $dates = ['deleted_at'];
+    protected $fillable = [
+        'name',
+        'guard_name',
+        'description',
+    ];
+
+    protected $dates = [
+        'deleted_at',
+    ];
 }
 

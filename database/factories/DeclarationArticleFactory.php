@@ -30,3 +30,4 @@ class DeclarationArticleFactory extends Factory
 
 
 
+

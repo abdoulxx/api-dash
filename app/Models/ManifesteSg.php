@@ -58,6 +58,52 @@ class ManifesteSg extends Model
         'ulid' => 'string',
     ];
 
+    protected $appends = ['numero_manifeste_complet', 'identifiant'];
+
+    /**
+     * Accessor pour le numéro de manifeste complet
+     * Format: CODE_BUREAU || ' ' || ANNEE_MANIFESTE || ' ' || NUMERO_SEQUENTIEL
+     */
+    public function getNumeroManifesteCompletAttribute(): ?string
+    {
+        // Si num_manifeste existe déjà et correspond au format attendu, le retourner
+        if ($this->num_manifeste && preg_match('/^[A-Z0-9]+\s+\d{4}\s+\d+$/', $this->num_manifeste)) {
+            return $this->num_manifeste;
+        }
+
+        // Sinon, construire à partir des composants
+        if ($this->code_bureau && $this->annee_manifeste) {
+            $numeroSequential = $this->num_man_sydam ?? $this->instance_id;
+            return sprintf('%s %d %s', $this->code_bureau, $this->annee_manifeste, $numeroSequential);
+        }
+
+        return $this->num_manifeste;
+    }
+
+    /**
+     * Accessor pour l'identifiant lisible (fallback)
+     * Format: NUM_MANIFESTE (si présent) OU CODE_BUREAU || ' ' || ANNEE_MANIFESTE || ' ' || NUM_MAN_SYDAM OU CODE_BUREAU || ' ' || ANNEE_MANIFESTE || ' ' || INSTANCE_ID
+     */
+    public function getIdentifiantAttribute(): ?string
+    {
+        // Priorité 1: num_manifeste si présent
+        if ($this->num_manifeste) {
+            return $this->num_manifeste;
+        }
+
+        // Priorité 2: Construction avec NUM_MAN_SYDAM
+        if ($this->code_bureau && $this->annee_manifeste && $this->num_man_sydam) {
+            return sprintf('%s %d %s', $this->code_bureau, $this->annee_manifeste, $this->num_man_sydam);
+        }
+
+        // Priorité 3: Construction avec INSTANCE_ID
+        if ($this->code_bureau && $this->annee_manifeste && $this->instance_id) {
+            return sprintf('%s %d %s', $this->code_bureau, $this->annee_manifeste, $this->instance_id);
+        }
+
+        return null;
+    }
+
     /**
      * Relation avec les titres de transport
      */
@@ -82,4 +128,8 @@ class ManifesteSg extends Model
         return $this->hasMany(DeclarationSg::class, 'num_manifeste', 'num_manifeste');
     }
 }
+
+
+
+
 

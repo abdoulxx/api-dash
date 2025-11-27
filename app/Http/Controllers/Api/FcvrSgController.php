@@ -43,66 +43,105 @@ class FcvrSgController extends Controller
 
         $cacheKey = sprintf('fcvr_sg.index.%s.%s', $page, md5($search.$perPage));
 
-        $data = CacheTagger::tags(['fcvr_sg'])->remember($cacheKey, 300, function () use ($search, $perPage, $page) {
+        $payload = CacheTagger::tags(['fcvr_sg'])->remember($cacheKey, 300, function () use ($search, $perPage, $page) {
             $query = FcvrSg::query();
 
             if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('num_rfcv', 'like', "%{$search}%")
-                      ->orWhere('num_fdi', 'like', "%{$search}%")
-                      ->orWhere('nom_importateur', 'like', "%{$search}%");
+                        ->orWhere('num_fdi', 'like', "%{$search}%")
+                        ->orWhere('nom_importateur', 'like', "%{$search}%")
+                        ->orWhereRaw("CONCAT(annee, bureau, 'C', COALESCE(num_rfcv, id)) like ?", ["%{$search}%"]);
                 });
             }
 
-            $fcvr = $query->latest('date_rfcv')->paginate($perPage, ['*'], 'page', $page);
+            $paginator = $query->latest('date_rfcv')->paginate($perPage, ['*'], 'page', $page);
+
+            $items = $paginator->getCollection()
+                ->map(function (FcvrSg $fcvr) {
+                    $data = $fcvr->toArray();
+                    $data['numero_fcvr_complet'] = $fcvr->numero_fcvr_complet;
+                    $data['identifiant'] = $fcvr->identifiant;
+                    $data['message_resume'] = sprintf(
+                        '%s | Importateur : %s | Valeur CAF : %s %s',
+                        $fcvr->numero_fcvr_complet ?? $fcvr->num_rfcv,
+                        $fcvr->nom_importateur ?? 'N/A',
+                        $fcvr->caf_rfcv_cfa ?? $fcvr->val_fact_rfcv_cfa ?? '0',
+                        $fcvr->devise ?? 'XOF'
+                    );
+
+                    return $data;
+                })
+                ->values()
+                ->toArray();
 
             return [
-                'data' => $fcvr->items(),
                 'meta' => [
-                    'current_page' => $fcvr->currentPage(),
-                    'last_page' => $fcvr->lastPage(),
-                    'per_page' => $fcvr->perPage(),
-                    'total' => $fcvr->total(),
-                    'from' => $fcvr->firstItem(),
-                    'to' => $fcvr->lastItem(),
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
                 ],
                 'links' => [
-                    'first' => $fcvr->url(1),
-                    'last' => $fcvr->url($fcvr->lastPage()),
-                    'prev' => $fcvr->previousPageUrl(),
-                    'next' => $fcvr->nextPageUrl(),
+                    'first' => $paginator->url(1),
+                    'last' => $paginator->url($paginator->lastPage()),
+                    'prev' => $paginator->previousPageUrl(),
+                    'next' => $paginator->nextPageUrl(),
                 ],
+                'items' => $items,
             ];
         });
 
+        $meta = $payload['meta'];
+        $links = $payload['links'];
+
         // Vérifier si la page demandée existe
-        if ($page > $data['meta']['last_page'] && $data['meta']['last_page'] > 0) {
+        if ($page > $meta['last_page'] && $meta['last_page'] > 0) {
             return response()->json([
                 'status' => 404,
                 'message' => sprintf(
                     'La page %d n\'existe pas. La dernière page disponible est la page %d (sur un total de %d résultat(s))',
                     $page,
-                    $data['meta']['last_page'],
-                    $data['meta']['total']
+                    $meta['last_page'],
+                    $meta['total']
                 ),
                 'data' => [],
-                'meta' => $data['meta'],
-                'links' => $data['links'] ?? null,
+                'meta' => $meta,
+                'links' => $links,
             ], 404);
         }
 
+        $lastPageDisplay = max($meta['last_page'], 1);
+        $message = $meta['total'] > 0
+            ? ($search
+                ? sprintf('Recherche "%s" : %d FCVR trouvée(s). Page %d/%d', $search, $meta['total'], $meta['current_page'], $lastPageDisplay)
+                : sprintf('Liste des FCVR : %d enregistrement(s). Page %d/%d', $meta['total'], $meta['current_page'], $lastPageDisplay))
+            : ($search
+                ? sprintf('Aucun résultat pour "%s". Essayez avec un numéro FCVR, FDI ou importateur', $search)
+                : 'Aucune FCVR enregistrée. Créez votre premier enregistrement FCVR');
+
         return response()->json([
             'status' => 200,
-            'message' => 'FCVR récupérées avec succès',
-            'data' => $data['data'],
-            'meta' => $data['meta'],
-            'links' => $data['links'] ?? null,
+            'message' => $message,
+            'data' => $payload['items'],
+            'meta' => $meta,
+            'links' => $links,
         ]);
     }
 
     public function store(StoreFcvrSgRequest $request): JsonResponse
     {
-        $fcvr = FcvrSg::create($request->validated());
+        $payload = $request->validated();
+
+        if (empty($payload['instanceid'])) {
+            $payload['instanceid'] = (FcvrSg::max('instanceid') ?? FcvrSg::max('id') ?? 0) + 1;
+        }
+
+        if (empty($payload['num_tt'])) {
+            $payload['num_tt'] = $payload['instanceid'];
+        }
+
+        $fcvr = FcvrSg::create($payload);
         $fcvr->refresh();
 
         // Log the creation
@@ -111,10 +150,21 @@ class FcvrSgController extends Controller
 
         CacheTagger::tags(['fcvr_sg'])->flush();
 
+        $data = $fcvr->toArray();
+        $data['numero_fcvr_complet'] = $fcvr->numero_fcvr_complet;
+        $data['identifiant'] = $fcvr->identifiant;
+        $data['message_resume'] = sprintf(
+            '%s | Importateur : %s | Valeur CAF : %s %s',
+            $fcvr->identifiant,
+            $fcvr->nom_importateur ?? 'N/A',
+            $fcvr->caf_rfcv_cfa ?? $fcvr->val_fact_rfcv_cfa ?? '0',
+            $fcvr->devise ?? 'XOF'
+        );
+
         return response()->json([
             'status' => 201,
-            'message' => "La FCVR \"{$numero}\" a été créée avec succès",
-            'data' => $fcvr->toArray(),
+            'message' => "La FCVR \"{$fcvr->identifiant}\" a été créée avec succès",
+            'data' => $data,
         ], 201);
     }
 
@@ -130,49 +180,126 @@ class FcvrSgController extends Controller
         }
         
         $cacheKey = "fcvr_sg.show." . ($fcvr->ulid ?? $fcvr->id);
-        
-        $data = CacheTagger::tags(['fcvr_sg'])->remember(
+
+        $payload = CacheTagger::tags(['fcvr_sg'])->remember(
             $cacheKey,
             now()->addMinutes(5),
             function () use ($fcvr) {
-                // Charger les relations et retourner toutes les données
                 $fcvr->load(['articles', 'fdi', 'declaration']);
-                return $fcvr->toArray();
+
+                $data = $fcvr->toArray();
+                $data['numero_fcvr_complet'] = $fcvr->numero_fcvr_complet;
+                $data['identifiant'] = $fcvr->identifiant;
+                $data['message_resume'] = sprintf(
+                    '%s | Importateur : %s | Valeur CAF : %s %s',
+                    $fcvr->identifiant,
+                    $fcvr->nom_importateur ?? 'N/A',
+                    $fcvr->caf_rfcv_cfa ?? $fcvr->val_fact_rfcv_cfa ?? '0',
+                    $fcvr->devise ?? 'XOF'
+                );
+
+                $relations = [
+                    'fdi' => $fcvr->fdi ? $fcvr->fdi->toArray() : null,
+                    'declaration' => $fcvr->declaration ? $fcvr->declaration->toArray() : null,
+                    'articles' => $fcvr->articles
+                        ? $fcvr->articles->map(fn ($article) => $article->toArray())->all()
+                        : [],
+                ];
+
+                return [
+                    'data' => $data,
+                    'relations' => $relations,
+                ];
             }
         );
 
+        if (!is_array($payload) || !isset($payload['data'])) {
+            $data = $fcvr->toArray();
+            $data['numero_fcvr_complet'] = $fcvr->numero_fcvr_complet;
+            $data['identifiant'] = $fcvr->identifiant;
+            $payload = [
+                'data' => $data,
+                'relations' => [
+                    'fdi' => $fcvr->fdi ? $fcvr->fdi->toArray() : null,
+                    'declaration' => $fcvr->declaration ? $fcvr->declaration->toArray() : null,
+                    'articles' => $fcvr->articles
+                        ? $fcvr->articles->map(fn ($article) => $article->toArray())->all()
+                        : [],
+                ],
+            ];
+
+            CacheTagger::tags(['fcvr_sg'])->put($cacheKey, $payload, now()->addMinutes(5));
+        }
+
+        $fcvrData = $payload['data'];
+        $relations = $payload['relations'];
+
+        $details = [];
+        $details[] = 'Importateur : ' . ($fcvrData['nom_importateur'] ?? 'N/A');
+        if ($fcvrData['devise']) {
+            $details[] = 'Devise : ' . $fcvrData['devise'];
+        }
+        if ($fcvrData['caf_rfcv_cfa']) {
+            $details[] = 'CAF : ' . number_format((float) $fcvrData['caf_rfcv_cfa'], 0, ',', ' ') . ' FCFA';
+        }
+        if (!empty($relations['declaration'])) {
+            $details[] = 'Déclaration liée : ' . ($relations['declaration']['declaration'] ?? '');
+        }
+        $detailsStr = $details ? ' | ' . implode(' | ', $details) : '';
+
         return response()->json([
             'status' => 200,
-            'message' => 'FCVR récupérée avec succès',
-            'data' => $data,
+            'message' => "FCVR \"{$fcvrData['identifiant']}\" récupérée avec succès{$detailsStr}",
+            'data' => [
+                'fcvr' => $fcvrData,
+                'relations' => $relations,
+            ],
         ]);
     }
 
     public function update(Request $request, string $fcvrSg): JsonResponse
     {
-        // Récupérer le FCVR par ULID ou ID
-        if (\Illuminate\Support\Str::isUlid($fcvrSg)) {
-            $fcvr = FcvrSg::where('ulid', $fcvrSg)->firstOrFail();
-        } elseif (is_numeric($fcvrSg)) {
-            $fcvr = FcvrSg::where('id', $fcvrSg)->firstOrFail();
-        } else {
-            $fcvr = FcvrSg::where('ulid', $fcvrSg)->firstOrFail();
-        }
-        
+        $fcvr = $this->findFcvr($fcvrSg);
+
+        $payload = $request->all();
         $oldValues = $fcvr->toArray();
-        $fcvr->update($request->all());
+
+        $fcvr->fill($payload);
+        $dirtyFields = array_keys($fcvr->getDirty());
+        $fcvr->save();
         $fcvr->refresh();
 
-        // Log the update
-        $numero = $fcvr->num_rfcv ?? "N°{$fcvr->id}";
-        AuditService::log('update', "La FCVR \"{$numero}\" a été modifiée", 'FcvrSg', $fcvr->id, $oldValues, $fcvr->toArray());
+        $numero = $fcvr->identifiant;
+        $details = $dirtyFields
+            ? 'Champs modifiés : ' . implode(', ', $dirtyFields)
+            : 'Aucun changement détecté';
+
+        AuditService::log(
+            'update',
+            "La FCVR \"{$numero}\" a été modifiée | {$details}",
+            'FcvrSg',
+            $fcvr->id,
+            $oldValues,
+            $fcvr->toArray()
+        );
 
         CacheTagger::tags(['fcvr_sg'])->flush();
 
+        $data = $fcvr->toArray();
+        $data['numero_fcvr_complet'] = $fcvr->numero_fcvr_complet;
+        $data['identifiant'] = $fcvr->identifiant;
+        $data['message_resume'] = sprintf(
+            '%s | Importateur : %s | Valeur CAF : %s %s',
+            $fcvr->identifiant,
+            $fcvr->nom_importateur ?? 'N/A',
+            $fcvr->caf_rfcv_cfa ?? $fcvr->val_fact_rfcv_cfa ?? '0',
+            $fcvr->devise ?? 'XOF'
+        );
+
         return response()->json([
             'status' => 200,
-            'message' => "La FCVR \"{$numero}\" a été modifiée avec succès",
-            'data' => $fcvr->toArray(),
+            'message' => "La FCVR \"{$numero}\" a été mise à jour avec succès | {$details}",
+            'data' => $data,
         ]);
     }
 
@@ -245,10 +372,57 @@ class FcvrSgController extends Controller
     {
         $fcvr = $this->findFcvr($fcvrSg);
 
+        $cacheKey = sprintf('fcvr_sg.%s.declaration', $fcvr->ulid ?? $fcvr->id);
+
+        $payload = CacheTagger::tags(['fcvr_sg', 'declarations'])->remember($cacheKey, 300, function () use ($fcvr) {
+            $declaration = $fcvr->declaration;
+
+            if (!$declaration) {
+                return null;
+            }
+
+            $declarationData = $declaration->toArray();
+            $declarationData['identifiant'] = $declaration->identifiant;
+            $declarationData['message_resume'] = sprintf(
+                '%s | Bureau %s | Valeur CAF : %s %s',
+                $declaration->identifiant,
+                $declaration->bureau ?? 'N/A',
+                number_format((float) ($declaration->valeur_caf_declaration ?? 0), 0, ',', ' '),
+                $declaration->devise ?? 'XOF'
+            );
+
+            return [
+                'fcvr' => [
+                    'identifiant' => $fcvr->identifiant,
+                    'numero_fcvr_complet' => $fcvr->numero_fcvr_complet,
+                    'num_rfcv' => $fcvr->num_rfcv,
+                ],
+                'declaration' => $declarationData,
+            ];
+        });
+
+        if (!$payload) {
+            return response()->json([
+                'status' => 404,
+                'message' => sprintf(
+                    'Aucune déclaration n’est encore rattachée à la FCVR "%s". Vérifiez le chaînage ANNEE+BUREAU+\'C\'+SEQ décrit dans la note FCVR.',
+                    $fcvr->identifiant
+                ),
+                'data' => null,
+            ], 404);
+        }
+
+        $message = sprintf(
+            'Déclaration "%s" liée à la FCVR "%s" (%s) récupérée avec succès',
+            $payload['declaration']['identifiant'],
+            $payload['fcvr']['identifiant'],
+            $payload['fcvr']['numero_fcvr_complet'] ?? $fcvr->identifiant
+        );
+
         return response()->json([
             'status' => 200,
-            'message' => 'Déclaration liée récupérée avec succès',
-            'data' => $fcvr->declaration,
+            'message' => $message,
+            'data' => $payload,
         ]);
     }
 
@@ -264,16 +438,63 @@ class FcvrSgController extends Controller
         if (!$declaration) {
             return response()->json([
                 'status' => 404,
-                'message' => 'Déclaration introuvable pour cette comparaison',
+                'message' => sprintf(
+                    'Aucune déclaration trouvée pour la comparaison avec la FCVR "%s" (%s). Vérifiez le chaînage ANNEE+BUREAU+\'C\'+SEQ ou fournissez un declaration_ulid valide.',
+                    $fcvr->identifiant,
+                    $fcvr->numero_fcvr_complet
+                ),
                 'data' => null,
             ], 404);
         }
 
-        $comparison = $this->comparisonService->compare($fcvr, $declaration);
+        $cacheKey = sprintf('fcvr_sg.%s.compare.%s', $fcvr->ulid ?? $fcvr->id, $declaration->ulid ?? $declaration->id);
+
+        $comparison = CacheTagger::tags(['fcvr_sg', 'declarations'])->remember($cacheKey, 300, function () use ($fcvr, $declaration) {
+            return $this->comparisonService->compare($fcvr, $declaration);
+        });
+
+        // Log the comparison
+        $fcvrNumero = $fcvr->identifiant;
+        $declarationNumero = $declaration->identifiant;
+        $summary = $comparison['summary'] ?? [];
+        $okCount = $summary['ok'] ?? 0;
+        $totalCount = $summary['total'] ?? 0;
+        $dangerCount = $summary['danger'] ?? 0;
+
+        AuditService::log(
+            'compare',
+            sprintf(
+                'Comparaison FCVR "%s" (%s) avec déclaration "%s" : %d/%d contrôles OK, %d écart(s) bloquant(s)',
+                $fcvrNumero,
+                $fcvr->numero_fcvr_complet,
+                $declarationNumero,
+                $okCount,
+                $totalCount,
+                $dangerCount
+            ),
+            'FcvrSg',
+            $fcvr->id,
+            null,
+            [
+                'declaration_id' => $declaration->id,
+                'declaration_ulid' => $declaration->ulid,
+                'summary' => $summary,
+            ]
+        );
+
+        $message = sprintf(
+            'Comparaison FCVR "%s" (%s) / Déclaration "%s" réalisée : %d/%d contrôles OK%s',
+            $fcvrNumero,
+            $fcvr->numero_fcvr_complet,
+            $declarationNumero,
+            $okCount,
+            $totalCount,
+            $dangerCount > 0 ? sprintf(', %d écart(s) bloquant(s) détecté(s)', $dangerCount) : ''
+        );
 
         return response()->json([
             'status' => 200,
-            'message' => 'Comparaison FCVR/Déclaration réalisée avec succès',
+            'message' => $message,
             'data' => $comparison,
         ]);
     }
@@ -296,7 +517,29 @@ class FcvrSgController extends Controller
         }
 
         $comparison = $this->comparisonService->compare($fcvr, $declaration);
-        $passed = ($comparison['summary']['danger'] ?? 0) === 0;
+        $summary = $comparison['summary'] ?? [];
+        $totalChecks = $summary['total'] ?? count($comparison['comparisons'] ?? []);
+        $dangerCount = $summary['danger'] ?? 0;
+        $okCount = $summary['ok'] ?? 0;
+        $passed = $dangerCount === 0;
+        $completionRate = $totalChecks > 0 ? round(($okCount / $totalChecks) * 100, 1) : 0.0;
+
+        $fcvrInfo = [
+            'identifiant' => $fcvr->identifiant,
+            'numero_fcvr_complet' => $fcvr->numero_fcvr_complet,
+            'annee' => $fcvr->annee,
+            'bureau' => $fcvr->bureau,
+            'sequence' => $fcvr->num_rfcv,
+            'num_fdi' => $fcvr->num_fdi,
+            'num_declaration' => $fcvr->num_declaration,
+        ];
+
+        $declarationInfo = [
+            'identifiant' => $declaration->identifiant,
+            'bureau' => $declaration->bureau,
+            'date_declaration' => optional($declaration->date_declaration)->toDateString(),
+            'ulid' => $declaration->ulid,
+        ];
 
         // Log the validation
         $numero = $fcvr->num_rfcv ?? "N°{$fcvr->id}";
@@ -304,21 +547,39 @@ class FcvrSgController extends Controller
         AuditService::log('validate', "Validation de la FCVR \"{$numero}\" avec la déclaration \"{$declarationNum}\"", 'FcvrSg', $fcvr->id, null, [
             'passed' => $passed,
             'declaration_id' => $declaration->id,
-            'summary' => $comparison['summary'],
+            'summary' => $summary,
         ]);
+
+        $message = $passed
+            ? sprintf(
+                'Chaînage FCVR %s (ANNEE+BUREAU+\'C\'+SEQ) / Déclaration %s validé (%d/%d contrôles OK)',
+                $fcvrInfo['numero_fcvr_complet'] ?? $fcvrInfo['identifiant'],
+                $declarationInfo['identifiant'],
+                $okCount,
+                $totalChecks
+            )
+            : sprintf(
+                'Écarts détectés entre la FCVR %s et la déclaration %s : %d contrôle(s) critique(s)',
+                $fcvrInfo['numero_fcvr_complet'] ?? $fcvrInfo['identifiant'],
+                $declarationInfo['identifiant'],
+                $dangerCount
+            );
 
         return response()->json([
             'status' => 200,
-            'message' => $passed
-                ? "La FCVR \"{$numero}\" est valide : aucune incohérence bloquante"
-                : "La FCVR \"{$numero}\" nécessite un contrôle complémentaire",
+            'message' => $message,
             'data' => [
+                'fcvr' => $fcvrInfo,
+                'declaration' => $declarationInfo,
                 'passed' => $passed,
-                'summary' => $comparison['summary'],
+                'summary' => array_merge($summary, [
+                    'completion_rate' => $completionRate,
+                ]),
                 'blocking_issues' => collect($comparison['comparisons'])
                     ->where('status', 'danger')
                     ->values()
                     ->all(),
+                'comparisons' => $comparison['comparisons'],
             ],
         ]);
     }
@@ -367,4 +628,10 @@ class FcvrSgController extends Controller
         return null;
     }
 }
+
+
+
+
+
+
 

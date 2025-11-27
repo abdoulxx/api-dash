@@ -532,6 +532,57 @@ class UserController extends Controller
     }
 
     /**
+     * Get user photo
+     */
+    public function getPhoto(string $id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+        $userName = $user->full_name ?? $user->email;
+
+        if (!$user->photo) {
+            return response()->json([
+                'status' => 404,
+                'message' => "Aucune photo de profil trouvée pour {$userName}",
+                'data' => [
+                    'has_photo' => false,
+                    'photo' => null,
+                    'photo_url' => null,
+                ],
+            ], 404);
+        }
+
+        $photoUrl = asset('storage/' . $user->photo);
+        $photoExists = Storage::disk('public')->exists($user->photo);
+
+        if (!$photoExists) {
+            return response()->json([
+                'status' => 404,
+                'message' => "Le fichier photo de {$userName} n'existe plus sur le serveur",
+                'data' => [
+                    'has_photo' => false,
+                    'photo' => null,
+                    'photo_url' => null,
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 200,
+            'message' => "Photo de profil de {$userName} récupérée avec succès",
+            'data' => [
+                'has_photo' => true,
+                'photo' => $photoUrl,
+                'photo_path' => $user->photo,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * Upload or update user photo
      */
     public function uploadPhoto(Request $request, string $id): JsonResponse

@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BanqueTvfComp1 extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasPublicUlid;
 
     protected $table = 'banque_tvf_comp_1';
 
     protected $fillable = [
+        'ulid',
         'old_id',
         'annee_fdi',
         'num_fdi',
@@ -51,6 +53,7 @@ class BanqueTvfComp1 extends Model
     ];
 
     protected $casts = [
+        'ulid' => 'string',
         'date_fdi' => 'datetime',
         'date_autorisation_fdi' => 'datetime',
         'date_expiration_fdi' => 'datetime',

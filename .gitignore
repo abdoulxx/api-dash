@@ -1,6 +1,6 @@
 *.log
 .DS_Store
-# .env
+.env
 .env.backup
 .env.production
 .phpactor.json
@@ -22,10 +22,21 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Documentation
 *.md
-!README.md
-!README_DOCKER.md
+README.md
+README_DOCKER.md
 
 # Docker
+Dockerfile
+docker-compose*.yml
+docker/
 .docker/
-docker-compose.override.yml
+.dockerignore
+docker-entrypoint.sh
+docker-start.ps1
+
+# Helper scripts
+Makefile
+check_*.php

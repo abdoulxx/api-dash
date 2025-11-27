@@ -32,9 +32,28 @@ return Application::configure(basePath: dirname(__DIR__))
         // Handle 404 errors for API routes
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, $request) {
             if ($request->is('api/*')) {
+                // Try to extract model name from route if it's a route model binding issue
+                $route = $request->route();
+                $message = 'Ressource introuvable';
+                
+                if ($route) {
+                    $parameters = $route->parameters();
+                    // Check if any parameter looks like a ULID
+                    foreach ($parameters as $key => $value) {
+                        if (is_string($value) && \Illuminate\Support\Str::isUlid($value)) {
+                            $message = sprintf(
+                                'Ressource introuvable : aucun enregistrement trouvé avec l\'identifiant "%s" pour le paramètre "%s"',
+                                $value,
+                                $key
+                            );
+                            break;
+                        }
+                    }
+                }
+                
                 return response()->json([
                     'status' => 404,
-                    'message' => 'Ressource introuvable',
+                    'message' => $message,
                     'data' => null,
                 ], 404);
             }

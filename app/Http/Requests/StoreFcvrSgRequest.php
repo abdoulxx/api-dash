@@ -22,10 +22,10 @@ class StoreFcvrSgRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'instanceid' => ['required', 'integer'],
-            'num_tt' => ['required', 'integer'],
+            'instanceid' => ['nullable', 'integer'],
+            'num_tt' => ['nullable', 'integer'],
             'num_rfcv' => ['required', 'string', 'max:60'],
-            'annee' => ['nullable', 'string', 'max:4'],
+            'annee' => ['nullable', 'integer', 'digits:4'],
             'bureau' => ['nullable', 'string', 'max:20'],
             'num_fdi' => ['nullable', 'string', 'max:128'],
             'date_fdi' => ['nullable', 'date'],
@@ -36,7 +36,7 @@ class StoreFcvrSgRequest extends FormRequest
             'nombre_conteneur' => ['nullable', 'integer'],
             'poids_net_total' => ['nullable', 'numeric'],
             'poids_brut_total' => ['nullable', 'numeric'],
-            'nombre_total_colis' => ['nullable', 'string', 'max:80'],
+            'nombre_total_colis' => ['nullable', 'numeric'],
             'lieu_chrg' => ['nullable', 'string', 'max:240'],
             'lieu_dechrg' => ['nullable', 'string', 'max:240'],
             'date_rfcv' => ['nullable', 'date'],
@@ -60,7 +60,7 @@ class StoreFcvrSgRequest extends FormRequest
             'val_fact_rfcv_cfa' => ['nullable', 'numeric'],
             'observation' => ['nullable', 'string'],
             'incoterm' => ['nullable', 'string', 'max:40'],
-            'devise' => ['nullable', 'string', 'max:12'],
+            'devise' => ['nullable', 'string', 'max:40'],
             'taux_devise' => ['nullable', 'numeric'],
             'fob_rfcv' => ['nullable', 'numeric'],
             'fob_rfcv_cfa' => ['nullable', 'numeric'],

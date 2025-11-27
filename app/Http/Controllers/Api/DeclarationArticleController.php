@@ -94,3 +94,4 @@ class DeclarationArticleController extends Controller
 
 
 
+

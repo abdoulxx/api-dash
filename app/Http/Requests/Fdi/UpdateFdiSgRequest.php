@@ -13,10 +13,26 @@ class UpdateFdiSgRequest extends FormRequest
 
     public function rules(): array
     {
-        $fdiId = $this->route('sg')?->id ?? null;
+        // Récupérer la FDI depuis le paramètre de route
+        $fdi = $this->route('fdi_sg') ?? $this->route('sg');
+        $fdiId = $fdi?->id ?? null;
+        $currentNumeroFdi = $fdi?->numero_fdi ?? null;
+
+        // Règle pour numero_fdi : uniquement si modifié
+        $numeroFdiRule = ['sometimes', 'string', 'max:60'];
+        
+        // Si numero_fdi est fourni et différent de la valeur actuelle, vérifier l'unicité
+        if ($this->has('numero_fdi') && $this->input('numero_fdi') !== $currentNumeroFdi) {
+            if ($fdiId) {
+                $numeroFdiRule[] = 'unique:fdi_sg,numero_fdi,' . $fdiId;
+            } else {
+                $numeroFdiRule[] = 'unique:fdi_sg,numero_fdi';
+            }
+        }
+        // Si numero_fdi n'est pas fourni ou est identique, pas de vérification d'unicité
 
         return [
-            'numero_fdi' => ['sometimes', 'string', 'max:60', 'unique:fdi_sg,numero_fdi,' . $fdiId],
+            'numero_fdi' => $numeroFdiRule,
             'serie_fdi' => ['sometimes', 'nullable', 'string', 'max:4'],
             'bureau' => ['sometimes', 'nullable', 'string', 'max:20'],
             'annee' => ['sometimes', 'nullable', 'integer'],
@@ -52,5 +68,22 @@ class UpdateFdiSgRequest extends FormRequest
             'declarant' => ['sometimes', 'nullable', 'string'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'numero_fdi.unique' => 'Ce numéro FDI est déjà utilisé par une autre FDI. Veuillez choisir un numéro unique.',
+            'numero_fdi.max' => 'Le numéro FDI ne peut pas dépasser 60 caractères.',
+            'serie_fdi.max' => 'La série FDI ne peut pas dépasser 4 caractères.',
+            'bureau.max' => 'Le code bureau ne peut pas dépasser 20 caractères.',
+            'numero_serie.max' => 'Le numéro de série ne peut pas dépasser 24 caractères.',
+        ];
+    }
 }
+
+
+
+
+
+
 

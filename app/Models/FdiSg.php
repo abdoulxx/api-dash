@@ -119,5 +119,35 @@ class FdiSg extends Model
     {
         return $this->hasMany(FdiRechComp::class, 'fdi_primaire', 'numero_fdi');
     }
+
+    /**
+     * Accessor pour le numéro FDI complet (concaténation)
+     * Format: ANNEE || BUREAU || SERIE_FDI || NUMERO_SERIE
+     * Exemple: 2020CIAB1A002128
+     */
+    public function getNumeroFdiCompletAttribute(): ?string
+    {
+        if (!$this->annee || !$this->bureau || !$this->serie_fdi || !$this->numero_serie) {
+            return $this->numero_fdi; // Retourner le numero_fdi si les composants ne sont pas disponibles
+        }
+
+        return $this->annee . $this->bureau . $this->serie_fdi . $this->numero_serie;
+    }
+
+    /**
+     * Accessor pour obtenir un identifiant lisible de la FDI
+     */
+    public function getIdentifiantAttribute(): string
+    {
+        if ($this->numero_fdi_complet) {
+            return $this->numero_fdi_complet;
+        }
+        
+        if ($this->numero_fdi) {
+            return $this->numero_fdi;
+        }
+
+        return "FDI #{$this->id}";
+    }
 }
 

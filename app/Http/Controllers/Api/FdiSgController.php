@@ -64,26 +64,73 @@ class FdiSgController extends Controller
         $page = (int) $request->integer('page', 1);
         $perPage = min($request->integer('per_page', 15), 100);
         $search = $request->string('search')->toString();
+        $annee = $request->integer('annee');
+        $bureau = $request->string('bureau')->toString();
+        $serie_fdi = $request->string('serie_fdi')->toString();
+        $numero_serie = $request->string('numero_serie')->toString();
 
-        $cacheKey = sprintf('fdi_sg.index.%s.%s', $page, md5($search.$perPage));
+        $cacheKey = sprintf('fdi_sg.index.%s.%s', $page, md5($search.$perPage.$annee.$bureau.$serie_fdi.$numero_serie));
 
-        $data = CacheTagger::tags(['fdi_sg'])->remember($cacheKey, now()->addMinutes(5), function () use ($search, $perPage) {
-            $paginator = FdiSg::query()
-                ->when($search, function ($query) use ($search) {
-                    $query->where('numero_fdi', 'like', "%{$search}%")
+        $payload = CacheTagger::tags(['fdi_sg'])->remember($cacheKey, 300, function () use ($search, $perPage, $annee, $bureau, $serie_fdi, $numero_serie) {
+            $query = FdiSg::query();
+
+            // Recherche par composants du numéro FDI
+            if ($annee) {
+                $query->where('annee', $annee);
+            }
+            if ($bureau) {
+                $query->where('bureau', 'like', "%{$bureau}%");
+            }
+            if ($serie_fdi) {
+                $query->where('serie_fdi', $serie_fdi);
+            }
+            if ($numero_serie) {
+                $query->where('numero_serie', 'like', "%{$numero_serie}%");
+            }
+
+            // Recherche textuelle générale
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('numero_fdi', 'like', "%{$search}%")
                         ->orWhere('importateur', 'like', "%{$search}%")
-                        ->orWhere('fournisseur', 'like', "%{$search}%");
-                })
-                ->orderByDesc('date_fdi')
-                ->paginate($perPage);
+                        ->orWhere('fournisseur', 'like', "%{$search}%")
+                        ->orWhere('cc', 'like', "%{$search}%")
+                        ->orWhereRaw("CONCAT(annee, bureau, serie_fdi, numero_serie) LIKE ?", ["%{$search}%"]);
+                });
+            }
 
-            return $this->formatPaginator($paginator);
+            $paginator = $query->orderByDesc('date_fdi')->paginate($perPage);
+
+            // Ajouter le numéro FDI complet à chaque élément
+            $items = $paginator->getCollection()->map(function ($fdi) {
+                $data = $fdi->toArray();
+                $data['numero_fdi_complet'] = $fdi->numero_fdi_complet;
+                $data['identifiant'] = $fdi->identifiant;
+                return $data;
+            });
+
+            $message = $paginator->total() > 0
+                ? ($search || $annee || $bureau || $serie_fdi || $numero_serie
+                    ? "Recherche : {$paginator->total()} FDI trouvée(s). Page {$paginator->currentPage()}/{$paginator->lastPage()}"
+                    : "Liste des FDI : {$paginator->total()} enregistrement(s). Page {$paginator->currentPage()}/{$paginator->lastPage()}")
+                : ($search || $annee || $bureau || $serie_fdi || $numero_serie
+                    ? "Aucun résultat pour cette recherche. Essayez avec un numéro FDI, importateur ou fournisseur"
+                    : "Aucune FDI enregistrée. Créez votre premier enregistrement FDI");
+
+            return [
+                'status' => 200,
+                'message' => $message,
+                'data' => $items->toArray(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ];
         });
 
-        return response()->json(array_merge([
-            'status' => 200,
-            'message' => 'FDI récupérées avec succès',
-        ], $data));
+        return response()->json($payload);
     }
 
     /**
@@ -113,15 +160,28 @@ class FdiSgController extends Controller
         $fdi->refresh();
 
         // Log the creation
-        $numero = $fdi->numero_fdi ?? "N°{$fdi->id}";
-        AuditService::log('create', "La FDI \"{$numero}\" a été créée", 'FdiSg', $fdi->id, null, $fdi->toArray());
+        $identifiant = $fdi->identifiant;
+        $details = [];
+        if ($fdi->importateur) {
+            $details[] = "Importateur : {$fdi->importateur}";
+        }
+        if ($fdi->date_fdi) {
+            $details[] = "Date : " . $fdi->date_fdi->format('d/m/Y');
+        }
+        $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+        
+        AuditService::log('create', "La FDI \"{$identifiant}\" a été créée{$detailsStr}", 'FdiSg', $fdi->id, null, $fdi->toArray());
 
         CacheTagger::tags(['fdi_sg'])->flush();
 
+        $data = $fdi->toArray();
+        $data['numero_fdi_complet'] = $fdi->numero_fdi_complet;
+        $data['identifiant'] = $identifiant;
+
         return response()->json([
             'status' => 201,
-            'message' => "La FDI \"{$numero}\" a été créée avec succès",
-            'data' => $fdi->toArray(),
+            'message' => "La FDI \"{$identifiant}\" a été créée avec succès{$detailsStr}",
+            'data' => $data,
         ], 201);
     }
 
@@ -149,17 +209,62 @@ class FdiSgController extends Controller
      */
     public function show(FdiSg $fdiSg): JsonResponse
     {
-        $data = CacheTagger::tags(['fdi_sg'])->remember(
+        $payload = CacheTagger::tags(['fdi_sg'])->remember(
             "fdi_sg.show.{$fdiSg->ulid}",
-            now()->addMinutes(5),
-            fn () => $fdiSg->load(['articles', 'fcvr', 'declarations'])->toArray()
+            300,
+            function () use ($fdiSg) {
+                $fdiSg->load(['articles', 'fcvr', 'declarations']);
+                
+                $identifiant = $fdiSg->identifiant;
+                $numeroComplet = $fdiSg->numero_fdi_complet;
+                
+                // Construire un message informatif
+                $details = [];
+                if ($fdiSg->date_fdi) {
+                    $details[] = "Date : " . $fdiSg->date_fdi->format('d/m/Y');
+                }
+                if ($fdiSg->importateur) {
+                    $details[] = "Importateur : {$fdiSg->importateur}";
+                }
+                if ($fdiSg->banque) {
+                    $details[] = "Banque : {$fdiSg->banque}";
+                }
+                if ($fdiSg->montant_domicilie_cfa) {
+                    $details[] = "Montant : " . number_format($fdiSg->montant_domicilie_cfa, 0, ',', ' ') . " FCFA";
+                }
+                $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+                
+                $message = "Détails de la FDI \"{$identifiant}\" récupérés{$detailsStr}";
+                if ($fdiSg->articles()->count() > 0) {
+                    $message .= " | {$fdiSg->articles()->count()} article(s)";
+                }
+                if ($fdiSg->declarations()->count() > 0) {
+                    $message .= " | {$fdiSg->declarations()->count()} déclaration(s)";
+                }
+
+                $data = $fdiSg->toArray();
+                $data['numero_fdi_complet'] = $numeroComplet;
+                $data['identifiant'] = $identifiant;
+                
+                // Ajouter les composants du numéro FDI pour référence
+                $data['composants_numero'] = [
+                    'annee' => $fdiSg->annee,
+                    'bureau' => $fdiSg->bureau,
+                    'serie_fdi' => $fdiSg->serie_fdi,
+                    'numero_serie' => $fdiSg->numero_serie,
+                    'numero_fdi' => $fdiSg->numero_fdi,
+                    'numero_fdi_complet' => $numeroComplet,
+                ];
+
+                return [
+                    'status' => 200,
+                    'message' => $message,
+                    'data' => $data,
+                ];
+            }
         );
 
-        return response()->json([
-            'status' => 200,
-            'message' => 'FDI récupérée avec succès',
-            'data' => $data,
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -199,17 +304,25 @@ class FdiSgController extends Controller
         $updated = $fdiSg->save();
 
         // Log the update
-        $numero = $fdiSg->numero_fdi ?? "N°{$fdiSg->id}";
-        AuditService::log('update', "La FDI \"{$numero}\" a été modifiée", 'FdiSg', $fdiSg->id, $oldValues, $fdiSg->toArray());
+        $identifiant = $fdiSg->identifiant;
+        $champsModifies = array_keys($payload);
+        $details = count($champsModifies) > 0 ? " | Champs modifiés : " . implode(', ', $champsModifies) : '';
+        
+        AuditService::log('update', "La FDI \"{$identifiant}\" a été modifiée{$details}", 'FdiSg', $fdiSg->id, $oldValues, $fdiSg->toArray());
 
         CacheTagger::tags(['fdi_sg'])->flush();
 
         $fresh = $fdiSg->fresh();
+        $data = $fresh ? $fresh->toArray() : [];
+        if ($fresh) {
+            $data['numero_fdi_complet'] = $fresh->numero_fdi_complet;
+            $data['identifiant'] = $fresh->identifiant;
+        }
 
         return response()->json([
             'status' => 200,
-            'message' => "La FDI \"{$numero}\" a été modifiée avec succès",
-            'data' => $fresh ? $fresh->toArray() : [],
+            'message' => "La FDI \"{$identifiant}\" a été modifiée avec succès{$details}",
+            'data' => $data,
         ]);
     }
 
@@ -233,22 +346,71 @@ class FdiSgController extends Controller
      */
     public function destroy(FdiSg $fdiSg): JsonResponse
     {
-        $numero = $fdiSg->numero_fdi ?? "N°{$fdiSg->id}";
+        $identifiant = $fdiSg->identifiant;
         $oldValues = $fdiSg->toArray();
         
-        $deleted = $fdiSg->getConnection()
-            ->table('fdi_sg')
-            ->where('id', $fdiSg->getKey())
-            ->delete();
+        $details = [];
+        if ($fdiSg->articles()->count() > 0) {
+            $details[] = "{$fdiSg->articles()->count()} article(s) associé(s)";
+        }
+        if ($fdiSg->declarations()->count() > 0) {
+            $details[] = "{$fdiSg->declarations()->count()} déclaration(s) associée(s)";
+        }
+        $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+        
+        $deleted = $fdiSg->delete(); // Utiliser soft delete
         
         // Log the deletion
-        AuditService::log('delete', "La FDI \"{$numero}\" a été supprimée", 'FdiSg', $fdiSg->id, $oldValues, null);
+        AuditService::log('delete', "La FDI \"{$identifiant}\" a été supprimée{$detailsStr}", 'FdiSg', $fdiSg->id, $oldValues, null);
         
         CacheTagger::tags(['fdi_sg'])->flush();
 
         return response()->json([
             'status' => 200,
-            'message' => "La FDI \"{$numero}\" a été supprimée avec succès",
+            'message' => "La FDI \"{$identifiant}\" a été supprimée avec succès{$detailsStr}",
+        ]);
+    }
+
+    /**
+     * Restaurer une FDI supprimée (soft delete)
+     */
+    public function restore(string $ulid): JsonResponse
+    {
+        $fdi = FdiSg::withTrashed()->where('ulid', $ulid)->firstOrFail();
+
+        if (! $fdi->trashed()) {
+            return response()->json([
+                'status' => 200,
+                'message' => "La FDI \"{$fdi->identifiant}\" est déjà active. Aucune restauration nécessaire.",
+                'data' => $fdi->toArray(),
+            ]);
+        }
+
+        $fdi->restore();
+
+        // Relancer une validation asynchrone pour recalculer les états métier
+        Bus::dispatch(new ProcessFdiValidation($fdi->ulid));
+
+        // Audit + cache
+        AuditService::log('restore', "La FDI \"{$fdi->identifiant}\" a été restaurée et envoyée en revalidation", 'FdiSg', $fdi->id, null, [
+            'articles_count' => $fdi->articles()->count(),
+            'declarations_count' => $fdi->declarations()->count(),
+        ]);
+
+        CacheTagger::tags(['fdi_sg', 'fdi_validation'])->flush();
+
+        $data = $fdi->fresh()->toArray();
+        $data['numero_fdi_complet'] = $fdi->numero_fdi_complet;
+        $data['identifiant'] = $fdi->identifiant;
+
+        return response()->json([
+            'status' => 200,
+            'message' => "La FDI \"{$fdi->identifiant}\" a été restaurée avec succès et une revalidation asynchrone a été planifiée",
+            'data' => [
+                'fdi' => $data,
+                'validation_job_dispatched' => true,
+                'validation_result_endpoint' => "/api/fdi/sg/{$fdi->ulid}/validate/result",
+            ],
         ]);
     }
 
@@ -271,12 +433,24 @@ class FdiSgController extends Controller
      */
     public function articles(FdiSg $fdiSg): JsonResponse
     {
+        $identifiant = $fdiSg->identifiant;
         $paginator = $fdiSg->articles()->paginate(25);
 
-        return response()->json(array_merge([
+        $message = $paginator->total() > 0
+            ? "Articles de la FDI \"{$identifiant}\" : {$paginator->total()} article(s) trouvé(s). Page {$paginator->currentPage()}/{$paginator->lastPage()}"
+            : "Aucun article trouvé pour la FDI \"{$identifiant}\"";
+
+        return response()->json([
             'status' => 200,
-            'message' => 'Articles récupérés avec succès',
-        ], $this->formatPaginator($paginator)));
+            'message' => $message,
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     /**
@@ -298,19 +472,29 @@ class FdiSgController extends Controller
      */
     public function fcvr(FdiSg $fdiSg): JsonResponse
     {
+        $identifiant = $fdiSg->identifiant;
         $fcvr = $fdiSg->fcvr;
 
         if ($fcvr === null) {
             return response()->json([
                 'status' => 200,
-                'message' => 'Aucune FCVR associée à cette FDI',
+                'message' => "Aucune FCVR associée à la FDI \"{$identifiant}\". Créez une FCVR pour cette FDI",
                 'data' => null,
             ]);
         }
 
+        $details = [];
+        if ($fcvr->numero_rfcv) {
+            $details[] = "RFCV : {$fcvr->numero_rfcv}";
+        }
+        if ($fcvr->date_rfcv) {
+            $details[] = "Date : " . $fcvr->date_rfcv->format('d/m/Y');
+        }
+        $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+
         return response()->json([
             'status' => 200,
-            'message' => 'FCVR récupérée avec succès',
+            'message' => "FCVR de la FDI \"{$identifiant}\" récupérée avec succès{$detailsStr}",
             'data' => $fcvr->toArray(),
         ]);
     }
@@ -334,12 +518,24 @@ class FdiSgController extends Controller
      */
     public function declarations(FdiSg $fdiSg): JsonResponse
     {
+        $identifiant = $fdiSg->identifiant;
         $paginator = $fdiSg->declarations()->paginate(25);
 
-        return response()->json(array_merge([
+        $message = $paginator->total() > 0
+            ? "Déclarations de la FDI \"{$identifiant}\" : {$paginator->total()} déclaration(s) trouvée(s). Page {$paginator->currentPage()}/{$paginator->lastPage()}"
+            : "Aucune déclaration trouvée pour la FDI \"{$identifiant}\"";
+
+        return response()->json([
             'status' => 200,
-            'message' => 'Déclarations récupérées avec succès',
-        ], $this->formatPaginator($paginator)));
+            'message' => $message,
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     /**
@@ -376,9 +572,21 @@ class FdiSgController extends Controller
 
         $result = $this->service->compareFdi($fdiSg, $secondary);
 
+        $primaryIdentifiant = $fdiSg->identifiant;
+        $secondaryIdentifiant = $secondary->identifiant;
+        
+        $details = [];
+        if ($result['summary']['total_financial_diffs'] > 0) {
+            $details[] = "{$result['summary']['total_financial_diffs']} écart(s) financier(s)";
+        }
+        if ($result['summary']['total_context_diffs'] > 0) {
+            $details[] = "{$result['summary']['total_context_diffs']} écart(s) contextuel(s)";
+        }
+        $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : " | Aucun écart détecté";
+
         return response()->json([
             'status' => 200,
-            'message' => 'Comparaison effectuée avec succès',
+            'message' => "Comparaison entre FDI \"{$primaryIdentifiant}\" et \"{$secondaryIdentifiant}\" effectuée avec succès{$detailsStr}",
             'data' => $result,
         ]);
     }
@@ -400,21 +608,63 @@ class FdiSgController extends Controller
      *     @OA\Response(response=200, description="Validation en file d'attente", @OA\JsonContent(type="object"))
      * )
      */
-    public function validateFdi(FdiSg $fdiSg): JsonResponse
+    public function validateFdi(Request $request, FdiSg $fdiSg): JsonResponse
     {
-        $numero = $fdiSg->numero_fdi ?? "N°{$fdiSg->id}";
-        
-        Bus::dispatch(new ProcessFdiValidation($fdiSg->ulid));
+        $identifiant = $fdiSg->identifiant;
+        $async = $request->boolean('async', false);
 
-        // Log the validation job dispatch
-        AuditService::log('validate', "Validation de la FDI \"{$numero}\" en file d'attente", 'FdiSg', $fdiSg->id, null, [
-            'ulid' => $fdiSg->ulid,
-            'job_dispatched' => true,
-        ]);
+        // Si async, dispatcher le job
+        if ($async) {
+            Bus::dispatch(new ProcessFdiValidation($fdiSg->ulid));
+
+            $details = [];
+            if ($fdiSg->derniere_operation) {
+                $details[] = "Dernière opération : {$fdiSg->derniere_operation}";
+            }
+            if ($fdiSg->articles()->count() > 0) {
+                $details[] = "{$fdiSg->articles()->count()} article(s) à valider";
+            }
+            $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+            
+            AuditService::log('validate', "Validation asynchrone de la FDI \"{$identifiant}\" en file d'attente{$detailsStr}", 'FdiSg', $fdiSg->id, null, [
+                'ulid' => $fdiSg->ulid,
+                'job_dispatched' => true,
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => "Validation asynchrone de la FDI \"{$identifiant}\" en file d'attente{$detailsStr}. Le résultat sera disponible prochainement",
+                'data' => [
+                    'ulid' => $fdiSg->ulid,
+                    'job_dispatched' => true,
+                    'result_endpoint' => "/api/fdi/sg/{$fdiSg->ulid}/validate/result",
+                ],
+            ]);
+        }
+
+        // Validation synchrone
+        $result = $this->service->validateFdi($fdiSg);
+
+        $details = [];
+        if ($result['valid']) {
+            $details[] = "FDI valide";
+            if ($result['complete']) {
+                $details[] = "Tous les champs requis et recommandés sont présents";
+            } else {
+                $details[] = "{$result['summary']['recommended_fields_present']}/{$result['summary']['recommended_fields_total']} champs recommandés présents";
+            }
+        } else {
+            $details[] = count($result['missing_required']) . " champ(s) obligatoire(s) manquant(s)";
+        }
+        $details[] = "{$result['summary']['completion_percentage']}% de complétude";
+        $detailsStr = " | " . implode(' | ', $details);
+
+        AuditService::log('validate', "Validation de la FDI \"{$identifiant}\" effectuée{$detailsStr}", 'FdiSg', $fdiSg->id, null, $result);
 
         return response()->json([
             'status' => 200,
-            'message' => "Validation de la FDI \"{$numero}\" en file d'attente",
+            'message' => "Validation de la FDI \"{$identifiant}\" effectuée{$detailsStr}",
+            'data' => $result,
         ]);
     }
 
@@ -437,39 +687,35 @@ class FdiSgController extends Controller
      */
     public function calculateDroits(FdiSg $fdiSg): JsonResponse
     {
+        $identifiant = $fdiSg->identifiant;
+        
         $result = CacheTagger::tags(['fdi_sg'])->remember(
             "fdi_sg.droits.{$fdiSg->ulid}",
-            now()->addMinutes(10),
+            300,
             fn () => $this->service->calculateDroits($fdiSg)
         );
 
+        $details = [];
+        if ($result['base_taxable'] > 0) {
+            $details[] = "Base taxable : " . number_format($result['base_taxable'], 0, ',', ' ') . " FCFA";
+        }
+        if ($result['droits_douane'] > 0) {
+            $details[] = "Droits : " . number_format($result['droits_douane'], 0, ',', ' ') . " FCFA";
+        }
+        if ($result['tva'] > 0) {
+            $details[] = "TVA : " . number_format($result['tva'], 0, ',', ' ') . " FCFA";
+        }
+        if ($result['total_droits_taxes'] > 0) {
+            $details[] = "Total : " . number_format($result['total_droits_taxes'], 0, ',', ' ') . " FCFA";
+        }
+        $detailsStr = !empty($details) ? " | " . implode(' | ', $details) : '';
+
         return response()->json([
             'status' => 200,
-            'message' => 'Droits et taxes calculés avec succès',
+            'message' => "Droits et taxes calculés pour la FDI \"{$identifiant}\" avec succès{$detailsStr}",
             'data' => $result,
         ]);
     }
 
-    private function formatPaginator(LengthAwarePaginator $paginator): array
-    {
-        return [
-            'data' => $paginator->items(),
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
-            ],
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'from' => $paginator->firstItem(),
-                'last_page' => $paginator->lastPage(),
-                'path' => $paginator->path(),
-                'per_page' => $paginator->perPage(),
-                'to' => $paginator->lastItem(),
-                'total' => $paginator->total(),
-            ],
-        ];
-    }
 }
 

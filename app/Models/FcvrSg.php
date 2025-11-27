@@ -13,6 +13,8 @@ class FcvrSg extends Model
 
     protected $table = 'fcvr_sg';
 
+    protected $appends = ['numero_fcvr_complet', 'identifiant'];
+
     protected $fillable = [
         'instanceid',
         'annee',
@@ -133,6 +135,28 @@ class FcvrSg extends Model
     public function declaration()
     {
         return $this->belongsTo(DeclarationSg::class, 'num_declaration', 'declaration');
+    }
+
+    /**
+     * Numéro FCVR complet (ANNEE + BUREAU + 'C' + séquence)
+     */
+    public function getNumeroFcvrCompletAttribute(): ?string
+    {
+        if (!$this->annee || !$this->bureau) {
+            return $this->num_rfcv;
+        }
+
+        $sequence = $this->num_rfcv ?? $this->attributes['num_rfcv'] ?? $this->id ?? $this->instanceid;
+        if ($sequence === null) {
+            return $this->num_rfcv;
+        }
+
+        return sprintf('%s%sC%s', $this->annee, $this->bureau, ltrim((string) $sequence));
+    }
+
+    public function getIdentifiantAttribute(): string
+    {
+        return $this->numero_fcvr_complet ?? $this->num_rfcv ?? ("FCVR #{$this->id}");
     }
 }
 

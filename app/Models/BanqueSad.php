@@ -15,6 +15,7 @@ class BanqueSad extends Model
 
     protected $fillable = [
         'id_sad',
+        'ulid',
         'ref_ddu',
         'num_man',
         'bl_ddu',

@@ -71,7 +71,36 @@ class AdminController extends Controller
         $data['password'] = Hash::make($data['password']);
         $data['is_admin'] = true; // Force admin flag
 
+        // Set default name from firstname and lastname if not provided
+        if (!isset($data['name']) && isset($data['firstname']) && isset($data['lastname'])) {
+            $data['name'] = trim("{$data['firstname']} {$data['lastname']}");
+        }
+        
+        // Set default statut if not provided
+        if (!isset($data['statut'])) {
+            $data['statut'] = 'Actif';
+        }
+        
+        // Set is_active based on statut
+        $data['is_active'] = $data['statut'] === 'Actif';
+
+        // Handle role assignment - support both 'role' and 'roles'
+        $rolesToAssign = [];
+        if (isset($data['roles']) && is_array($data['roles'])) {
+            $rolesToAssign = $data['roles'];
+        } elseif (isset($data['role'])) {
+            $rolesToAssign = [$data['role']];
+        }
+        
+        // Remove role fields from data before creating user
+        unset($data['roles'], $data['role']);
+
         $admin = User::create($data);
+
+        // Assign roles if provided
+        if (!empty($rolesToAssign)) {
+            $admin->assignRole($rolesToAssign);
+        }
 
         // Assign roles if provided
         if (isset($data['roles'])) {
@@ -266,6 +295,57 @@ class AdminController extends Controller
         return response()->json([
             'status' => 200,
             'message' => "L'administrateur \"{$adminName}\" a été supprimé définitivement",
+        ]);
+    }
+
+    /**
+     * Get admin photo
+     */
+    public function getPhoto(string $id): JsonResponse
+    {
+        $admin = User::where('is_admin', true)->findOrFail($id);
+        $adminName = $admin->full_name ?? $admin->email;
+
+        if (!$admin->photo) {
+            return response()->json([
+                'status' => 404,
+                'message' => "Aucune photo de profil trouvée pour l'administrateur \"{$adminName}\"",
+                'data' => [
+                    'has_photo' => false,
+                    'photo' => null,
+                    'photo_url' => null,
+                ],
+            ], 404);
+        }
+
+        $photoUrl = asset('storage/' . $admin->photo);
+        $photoExists = Storage::disk('public')->exists($admin->photo);
+
+        if (!$photoExists) {
+            return response()->json([
+                'status' => 404,
+                'message' => "Le fichier photo de l'administrateur \"{$adminName}\" n'existe plus sur le serveur",
+                'data' => [
+                    'has_photo' => false,
+                    'photo' => null,
+                    'photo_url' => null,
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 200,
+            'message' => "Photo de profil de l'administrateur \"{$adminName}\" récupérée avec succès",
+            'data' => [
+                'has_photo' => true,
+                'photo' => $photoUrl,
+                'photo_path' => $admin->photo,
+                'admin' => [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                ],
+            ],
         ]);
     }
 

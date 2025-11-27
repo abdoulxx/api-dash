@@ -50,7 +50,25 @@ class StoreFdiSgRequest extends FormRequest
             'declarant' => ['nullable', 'string'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'numero_fdi.required' => 'Le numéro FDI est obligatoire.',
+            'numero_fdi.unique' => 'Ce numéro FDI est déjà utilisé. Veuillez choisir un numéro unique.',
+            'numero_fdi.max' => 'Le numéro FDI ne peut pas dépasser 60 caractères.',
+            'serie_fdi.max' => 'La série FDI ne peut pas dépasser 4 caractères.',
+            'bureau.max' => 'Le code bureau ne peut pas dépasser 20 caractères.',
+            'numero_serie.max' => 'Le numéro de série ne peut pas dépasser 24 caractères.',
+        ];
+    }
 }
+
+
+
+
+
+
 
 
 
