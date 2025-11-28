@@ -15,11 +15,82 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use App\Support\CacheTagger;
+use OpenApi\Annotations as OA;
 
+/**
+ * @OA\Tag(
+ *     name="Utilisateurs",
+ *     description="Gestion complete des utilisateurs applicatifs : CRUD, options, photos, historique d activite, statistiques et restauration."
+ * )
+ */
 class UserController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/users",
+     *     summary="Lister les utilisateurs",
+     *     description="Recupere une liste paginee des utilisateurs avec possibilite de recherche et filtres par role et statut. Exclut les administrateurs.",
+     *     operationId="listUsers",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom, prenom, nom de famille et email",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="query",
+     *         description="Filtrer par nom de role",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="statut",
+     *         in="query",
+     *         description="Filtrer par statut (Actif, Inactif, En attente)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"Actif", "Inactif", "En attente"})
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des utilisateurs",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="15 utilisateur(s) trouve(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=75)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -79,7 +150,47 @@ class UserController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/users",
+     *     summary="Creer un nouvel utilisateur",
+     *     description="Cree un nouvel utilisateur avec les informations fournies. Le mot de passe est hashe automatiquement. Les roles peuvent etre assignes via role (string) ou roles (array).",
+     *     operationId="createUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"firstname", "lastname", "email", "password", "password_confirmation"},
+     *             @OA\Property(property="firstname", type="string", example="Jean", description="Prenom"),
+     *             @OA\Property(property="lastname", type="string", example="Dupont", description="Nom de famille"),
+     *             @OA\Property(property="name", type="string", example="Jean Dupont", description="Nom complet genere automatiquement si non fourni"),
+     *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
+     *             @OA\Property(property="password", type="string", format="password", example="password123", minLength=6),
+     *             @OA\Property(property="password_confirmation", type="string", format="password", example="password123", minLength=6),
+     *             @OA\Property(property="statut", type="string", enum={"Actif", "Inactif", "En attente"}, example="Actif", description="Statut par defaut: Actif"),
+     *             @OA\Property(property="fonction", type="string", example="Developpeur", nullable=true),
+     *             @OA\Property(property="departement", type="string", example="IT", nullable=true),
+     *             @OA\Property(property="manager_id", type="string", example="01ARZ3NDEKTSV4RRFFQ69G5FAV", description="ULID du manager", nullable=true),
+     *             @OA\Property(property="phone", type="string", example="+33123456789", nullable=true),
+     *             @OA\Property(property="address", type="string", example="123 Rue Example, Paris", nullable=true),
+     *             @OA\Property(property="roles", type="array", @OA\Items(type="string"), example={"admin", "user"}, description="Tableau de noms de roles", nullable=true),
+     *             @OA\Property(property="role", type="string", example="user", description="Nom d un seul role (alternative a roles)", nullable=true),
+     *             @OA\Property(property="is_admin", type="boolean", example=false, nullable=true),
+     *             @OA\Property(property="is_active", type="boolean", example=true, description="Synchronise avec statut si non fourni", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Utilisateur cree avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=201),
+     *             @OA\Property(property="message", type="string", example="L utilisateur Jean Dupont a ete ajoute avec succes"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function store(StoreUserRequest $request): JsonResponse
     {
@@ -137,7 +248,32 @@ class UserController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/users/{id}",
+     *     summary="Afficher un utilisateur",
+     *     description="Recupere les details complets d un utilisateur avec ses roles, permissions, manager et les 10 derniers logs d audit.",
+     *     operationId="showUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Details de l utilisateur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Profil de Jean Dupont charge"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function show(string $id): JsonResponse
     {
@@ -161,7 +297,54 @@ class UserController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/users/{id}",
+     *     summary="Mettre a jour un utilisateur",
+     *     description="Met a jour les informations d un utilisateur. Tous les champs sont optionnels. Le mot de passe est hashe s il est fourni. Les roles peuvent etre mis a jour via role ou roles.",
+     *     operationId="updateUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="firstname", type="string", example="Jean", nullable=true),
+     *             @OA\Property(property="lastname", type="string", example="Dupont", nullable=true),
+     *             @OA\Property(property="name", type="string", example="Jean Dupont", nullable=true),
+     *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com", nullable=true),
+     *             @OA\Property(property="password", type="string", format="password", example="newpassword123", minLength=6, nullable=true),
+     *             @OA\Property(property="password_confirmation", type="string", format="password", example="newpassword123", minLength=6, nullable=true),
+     *             @OA\Property(property="statut", type="string", enum={"Actif", "Inactif", "En attente"}, example="Actif", nullable=true),
+     *             @OA\Property(property="fonction", type="string", example="Developpeur Senior", nullable=true),
+     *             @OA\Property(property="departement", type="string", example="IT", nullable=true),
+     *             @OA\Property(property="manager_id", type="string", example="01ARZ3NDEKTSV4RRFFQ69G5FAV", nullable=true),
+     *             @OA\Property(property="phone", type="string", example="+33123456789", nullable=true),
+     *             @OA\Property(property="address", type="string", example="123 Rue Example, Paris", nullable=true),
+     *             @OA\Property(property="roles", type="array", @OA\Items(type="string"), example={"admin", "user"}, nullable=true),
+     *             @OA\Property(property="role", type="string", example="user", nullable=true),
+     *             @OA\Property(property="is_admin", type="boolean", example=false, nullable=true),
+     *             @OA\Property(property="is_active", type="boolean", example=true, nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Utilisateur mis a jour avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Les modifications de Jean Dupont ont ete enregistrees"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve"),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function update(UpdateUserRequest $request, string $id): JsonResponse
     {
@@ -224,7 +407,31 @@ class UserController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage (soft delete).
+     * @OA\Delete(
+     *     path="/api/users/{id}",
+     *     summary="Supprimer un utilisateur (soft delete)",
+     *     description="Supprime un utilisateur de maniere logicielle (soft delete). L utilisateur peut etre restaure ulterieurement.",
+     *     operationId="deleteUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Utilisateur supprime (peut etre restaure)",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L utilisateur Jean Dupont a ete supprime (peut etre restaure)")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function destroy(string $id): JsonResponse
     {
@@ -250,7 +457,46 @@ class UserController extends Controller
     }
 
     /**
-     * Get trashed (soft deleted) users
+     * @OA\Get(
+     *     path="/api/users/trashed/list",
+     *     summary="Lister les utilisateurs supprimes",
+     *     description="Recupere une liste paginee des utilisateurs supprimes (soft deleted) avec possibilite de recherche.",
+     *     operationId="listTrashedUsers",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom, prenom, nom de famille et email",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des utilisateurs supprimes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="5 utilisateur(s) supprime(s) trouve(s)"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     )
+     * )
      */
     public function trashed(Request $request): JsonResponse
     {
@@ -297,7 +543,32 @@ class UserController extends Controller
     }
 
     /**
-     * Restore a soft deleted user
+     * @OA\Post(
+     *     path="/api/users/{id}/restore",
+     *     summary="Restaurer un utilisateur supprime",
+     *     description="Restaure un utilisateur qui a ete supprime (soft delete).",
+     *     operationId="restoreUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur supprime",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Utilisateur restaure avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L utilisateur Jean Dupont a ete restaure avec succes"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur supprime non trouve")
+     * )
      */
     public function restore(string $id): JsonResponse
     {
@@ -329,7 +600,31 @@ class UserController extends Controller
     }
 
     /**
-     * Permanently delete a user (force delete)
+     * @OA\Delete(
+     *     path="/api/users/{id}/force",
+     *     summary="Supprimer definitivement un utilisateur",
+     *     description="Supprime definitivement un utilisateur de la base de donnees. Cette action est irreversible. L utilisateur doit etre deja supprime (soft delete).",
+     *     operationId="forceDeleteUser",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur a supprimer definitivement",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Utilisateur supprime definitivement",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L utilisateur Jean Dupont a ete supprime definitivement")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur supprime non trouve")
+     * )
      */
     public function forceDelete(string $id): JsonResponse
     {
@@ -354,7 +649,68 @@ class UserController extends Controller
     }
 
     /**
-     * Get user activity history
+     * @OA\Get(
+     *     path="/api/users/{id}/activity-history",
+     *     summary="Historique d activite d un utilisateur",
+     *     description="Recupere l historique des activites (logs d audit) d un utilisateur avec possibilite de filtrage par action et dates.",
+     *     operationId="getUserActivityHistory",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="action",
+     *         in="query",
+     *         description="Filtrer par action(s) (separees par virgule: create,update,delete,restore,force_delete)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="create,update")
+     *     ),
+     *     @OA\Parameter(
+     *         name="start_date",
+     *         in="query",
+     *         description="Date de debut (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-01-01")
+     *     ),
+     *     @OA\Parameter(
+     *         name="end_date",
+     *         in="query",
+     *         description="Date de fin (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-12-31")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Historique d activite",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="25 activite(s) enregistree(s)"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function activityHistory(string $id, Request $request): JsonResponse
     {
@@ -401,7 +757,24 @@ class UserController extends Controller
     }
 
     /**
-     * Get available departments
+     * @OA\Get(
+     *     path="/api/users/options/departments",
+     *     summary="Liste des departements disponibles",
+     *     description="Recupere la liste de tous les departements distincts des utilisateurs existants.",
+     *     operationId="getDepartments",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des departements",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="5 departement(s) disponible(s)"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="string"), example={"IT", "RH", "Finance", "Marketing", "Production"})
+     *         )
+     *     )
+     * )
      */
     public function getDepartments(): JsonResponse
     {
@@ -425,7 +798,24 @@ class UserController extends Controller
     }
 
     /**
-     * Get available managers
+     * @OA\Get(
+     *     path="/api/users/options/managers",
+     *     summary="Liste des managers disponibles",
+     *     description="Recupere la liste de tous les managers disponibles (administrateurs ou utilisateurs ayant des subordonnes).",
+     *     operationId="getManagers",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des managers",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="10 manager(s) disponible(s)"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     )
+     * )
      */
     public function getManagers(): JsonResponse
     {
@@ -461,7 +851,24 @@ class UserController extends Controller
     }
 
     /**
-     * Get available fonctions
+     * @OA\Get(
+     *     path="/api/users/options/fonctions",
+     *     summary="Liste des fonctions disponibles",
+     *     description="Recupere la liste de toutes les fonctions distinctes des utilisateurs existants.",
+     *     operationId="getFonctions",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des fonctions",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="8 fonction(s) disponible(s)"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="string"), example={"Developpeur", "Chef de projet", "Analyste", "Designer", "Manager"})
+     *         )
+     *     )
+     * )
      */
     public function getFonctions(): JsonResponse
     {
@@ -491,7 +898,24 @@ class UserController extends Controller
     }
 
     /**
-     * Get available statuts
+     * @OA\Get(
+     *     path="/api/users/options/statuts",
+     *     summary="Liste des statuts disponibles",
+     *     description="Recupere la liste de tous les statuts possibles pour un utilisateur.",
+     *     operationId="getStatuts",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des statuts",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="3 statuts disponibles"),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="string"), example={"Actif", "Inactif", "En attente"})
+     *         )
+     *     )
+     * )
      */
     public function getStatuts(): JsonResponse
     {
@@ -503,7 +927,32 @@ class UserController extends Controller
     }
 
     /**
-     * Get user statistics
+     * @OA\Get(
+     *     path="/api/users/{id}/statistics",
+     *     summary="Statistiques d un utilisateur",
+     *     description="Recupere les statistiques detaillees d un utilisateur : jours depuis creation, derniere connexion, nombre d activites, nombre d utilisateurs geres, etc.",
+     *     operationId="getUserStatistics",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Statistiques de l utilisateur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Statistiques de Jean Dupont chargees"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function getStatistics(string $id): JsonResponse
     {
@@ -532,7 +981,31 @@ class UserController extends Controller
     }
 
     /**
-     * Get user photo
+     * @OA\Get(
+     *     path="/api/users/{id}/photo",
+     *     summary="Recuperer la photo de profil d un utilisateur",
+     *     description="Recupere l URL de la photo de profil d un utilisateur si elle existe.",
+     *     operationId="getUserPhoto",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil recuperee",
+     *         @OA\JsonContent(type="object")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Aucune photo trouvee",
+     *         @OA\JsonContent(type="object")
+     *     )
+     * )
      */
     public function getPhoto(string $id): JsonResponse
     {
@@ -583,7 +1056,43 @@ class UserController extends Controller
     }
 
     /**
-     * Upload or update user photo
+     * @OA\Post(
+     *     path="/api/users/{id}/photo",
+     *     summary="Uploader ou mettre a jour la photo de profil",
+     *     description="Upload une nouvelle photo de profil pour un utilisateur ou remplace l ancienne si elle existe. Formats acceptes: JPEG, PNG, JPG, GIF. Taille maximale: 2MB.",
+     *     operationId="uploadUserPhoto",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"photo"},
+     *                 @OA\Property(
+     *                     property="photo",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="Fichier image (JPEG, PNG, JPG, GIF, max 2MB)"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil mise a jour avec succes",
+     *         @OA\JsonContent(type="object")
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve"),
+     *     @OA\Response(response=422, description="Erreur de validation (fichier manquant, format invalide, taille excessive)")
+     * )
      */
     public function uploadPhoto(Request $request, string $id): JsonResponse
     {
@@ -637,7 +1146,31 @@ class UserController extends Controller
     }
 
     /**
-     * Delete user photo
+     * @OA\Delete(
+     *     path="/api/users/{id}/photo",
+     *     summary="Supprimer la photo de profil",
+     *     description="Supprime la photo de profil d un utilisateur (fichier et reference en base de donnees).",
+     *     operationId="deleteUserPhoto",
+     *     tags={"Utilisateurs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil supprimee avec succes",
+     *         @OA\JsonContent(type="object")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Aucune photo trouvee",
+     *         @OA\JsonContent(type="object")
+     *     )
+     * )
      */
     public function deletePhoto(string $id): JsonResponse
     {

@@ -15,6 +15,7 @@ use App\Support\CacheTagger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RechercheController extends Controller
 {
@@ -565,46 +566,74 @@ class RechercheController extends Controller
     /**
      * Construit un texte descriptif des filtres appliqués
      */
-    private function buildFiltersText(Request $request): string
+    private function buildFiltersText(Request $request, array $filterMapping = []): string
     {
         $filters = [];
         
-        if ($request->filled('search') || $request->filled('q')) {
-            $searchTerm = $request->input('search') ?? $request->input('q');
-            $filters[] = "recherche: \"{$searchTerm}\"";
-        }
-        
-        if ($request->filled('numero_manifeste_complet')) {
-            $filters[] = "numero_manifeste_complet: \"{$request->get('numero_manifeste_complet')}\"";
-        }
-        
-        if ($request->filled('num_manifeste')) {
-            $filters[] = "num_manifeste: {$request->get('num_manifeste')}";
-        }
-        
-        if ($request->filled('num_voyage')) {
-            $filters[] = "num_voyage: {$request->get('num_voyage')}";
-        }
-        
-        if ($request->filled('code_bureau')) {
-            $filters[] = "bureau: {$request->get('code_bureau')}";
-        }
-        
-        if ($request->filled('date_arrivee_min') && $request->filled('date_arrivee_max')) {
-            $filters[] = "période: {$request->get('date_arrivee_min')} à {$request->get('date_arrivee_max')}";
-        } elseif ($request->filled('date_arrivee_min')) {
-            $filters[] = "date_min: {$request->get('date_arrivee_min')}";
-        } elseif ($request->filled('date_arrivee_max')) {
-            $filters[] = "date_max: {$request->get('date_arrivee_max')}";
-        }
-        
-        if ($request->filled('annee_manifeste')) {
-            $filters[] = "année: {$request->get('annee_manifeste')}";
+        // Si un mapping est fourni, utiliser les clés du mapping
+        if (!empty($filterMapping)) {
+            foreach ($filterMapping as $key => $label) {
+                if ($request->filled($key)) {
+                    $value = $request->input($key);
+                    $filters[] = "{$label}: \"{$value}\"";
+                }
+            }
+        } else {
+            // Comportement par défaut pour les manifestes
+            if ($request->filled('search') || $request->filled('q')) {
+                $searchTerm = $request->input('search') ?? $request->input('q');
+                $filters[] = "recherche: \"{$searchTerm}\"";
+            }
+            
+            if ($request->filled('numero_manifeste_complet')) {
+                $filters[] = "numero_manifeste_complet: \"{$request->get('numero_manifeste_complet')}\"";
+            }
+            
+            if ($request->filled('num_manifeste')) {
+                $filters[] = "num_manifeste: {$request->get('num_manifeste')}";
+            }
+            
+            if ($request->filled('num_voyage')) {
+                $filters[] = "num_voyage: {$request->get('num_voyage')}";
+            }
+            
+            if ($request->filled('code_bureau')) {
+                $filters[] = "bureau: {$request->get('code_bureau')}";
+            }
+            
+            if ($request->filled('date_arrivee_min') && $request->filled('date_arrivee_max')) {
+                $filters[] = "période: {$request->get('date_arrivee_min')} à {$request->get('date_arrivee_max')}";
+            } elseif ($request->filled('date_arrivee_min')) {
+                $filters[] = "date_min: {$request->get('date_arrivee_min')}";
+            } elseif ($request->filled('date_arrivee_max')) {
+                $filters[] = "date_max: {$request->get('date_arrivee_max')}";
+            }
+            
+            if ($request->filled('annee_manifeste')) {
+                $filters[] = "année: {$request->get('annee_manifeste')}";
+            }
         }
 
-        return !empty($filters) ? ' avec filtre(s): ' . implode(', ', $filters) : '';
+        return !empty($filters) ? implode(', ', $filters) : '';
     }
 
+    /**
+     * Recherche simple de FDI
+     * GET /api/recherche/fdi
+     * 
+     * Paramètres :
+     * - search : Recherche textuelle "Google-like" (numero_fdi, numero_fdi_complet, importateur, fournisseur, banque, ref_facture)
+     * - numero_fdi : Numéro de la FDI
+     * - numero_fdi_complet : Numéro FDI complet (format: ANNEE || BUREAU || SERIE_FDI || NUMERO_SERIE)
+     * - reference_facture : Référence facture
+     * - banque : Nom de la banque
+     * - importateur : Nom de l'importateur
+     * - date_min : Date minimale (format: YYYY-MM-DD)
+     * - date_max : Date maximale (format: YYYY-MM-DD)
+     * - sort : Tri (ex: date_fdi,desc)
+     * - per_page : Nombre de résultats par page (défaut: 15, max: 100)
+     * - page : Numéro de page (défaut: 1)
+     */
     public function rechercheFdi(Request $request): JsonResponse
     {
         $cacheKey = 'recherche:fdi:' . md5($request->fullUrl());
@@ -612,12 +641,84 @@ class RechercheController extends Controller
         $payload = CacheTagger::tags(['recherche', 'fdi'])->remember($cacheKey, 300, function () use ($request) {
             $query = FdiSg::query();
 
-            $this->applyFilters($query, $request, [
-                'numero_fdi',
-                'reference_facture' => 'ref_facture',
-                'banque',
-                'importateur',
-            ]);
+            // Recherche "Google-like" sur plusieurs champs
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('numero_fdi', 'like', "%{$search}%")
+                      ->orWhere('importateur', 'like', "%{$search}%")
+                      ->orWhere('fournisseur', 'like', "%{$search}%")
+                      ->orWhere('banque', 'like', "%{$search}%")
+                  ->orWhere('ref_facture', 'like', "%{$search}%")
+                  ->orWhere('cc', 'like', "%{$search}%");
+                
+                // Recherche dans le numero_fdi_complet construit (convertir les entiers en text pour PostgreSQL)
+                $driver = DB::getDriverName();
+                if ($driver === 'pgsql') {
+                    $q->orWhereRaw("CONCAT(COALESCE(CAST(annee AS TEXT), ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(CAST(numero_serie AS TEXT), '')) LIKE ?", ["%{$search}%"]);
+                } else {
+                    $q->orWhereRaw("CONCAT(COALESCE(annee, ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(numero_serie, '')) LIKE ?", ["%{$search}%"]);
+                }
+                
+                // Si la valeur correspond au format "ANNEEBUREAUSERIENUMERO", recherche exacte
+                if (preg_match('/^(\d{4})([A-Z0-9]+)([A-Z])(\d+)$/', trim($search), $matches)) {
+                    $annee = (int) $matches[1];
+                    $bureau = $matches[2];
+                    $serie = $matches[3];
+                    $numero = $matches[4];
+                    
+                    $q->orWhere(function ($subQ) use ($annee, $bureau, $serie, $numero) {
+                        $subQ->where('annee', $annee)
+                             ->where('bureau', $bureau)
+                             ->where('serie_fdi', $serie)
+                             ->where('numero_serie', $numero);
+                    });
+                }
+            });
+            }
+
+            // Filtres spécifiques
+            if ($request->filled('numero_fdi')) {
+                $query->where('numero_fdi', 'like', "%{$request->input('numero_fdi')}%");
+            }
+
+            if ($request->filled('numero_fdi_complet')) {
+                $numeroComplet = $request->input('numero_fdi_complet');
+                // Recherche par numéro complet (format: ANNEE || BUREAU || SERIE_FDI || NUMERO_SERIE)
+                if (preg_match('/^(\d{4})([A-Z0-9]+)([A-Z])(\d+)$/', trim($numeroComplet), $matches)) {
+                    $annee = (int) $matches[1];
+                    $bureau = $matches[2];
+                    $serie = $matches[3];
+                    $numero = $matches[4];
+                    
+                    $query->where(function ($q) use ($annee, $bureau, $serie, $numero) {
+                        $q->where('annee', $annee)
+                          ->where('bureau', $bureau)
+                          ->where('serie_fdi', $serie)
+                          ->where('numero_serie', $numero);
+                    });
+                } else {
+                    // Recherche partielle dans le numéro complet construit (convertir les entiers en text pour PostgreSQL)
+                    $driver = DB::getDriverName();
+                    if ($driver === 'pgsql') {
+                        $query->whereRaw("CONCAT(COALESCE(CAST(annee AS TEXT), ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(CAST(numero_serie AS TEXT), '')) LIKE ?", ["%{$numeroComplet}%"]);
+                    } else {
+                        $query->whereRaw("CONCAT(COALESCE(annee, ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(numero_serie, '')) LIKE ?", ["%{$numeroComplet}%"]);
+                    }
+                }
+            }
+
+            if ($request->filled('reference_facture')) {
+                $query->where('ref_facture', 'like', "%{$request->input('reference_facture')}%");
+            }
+
+            if ($request->filled('banque')) {
+                $query->where('banque', 'like', "%{$request->input('banque')}%");
+            }
+
+            if ($request->filled('importateur')) {
+                $query->where('importateur', 'like', "%{$request->input('importateur')}%");
+            }
 
             if ($request->filled('date_min')) {
                 $query->whereDate('date_fdi', '>=', $request->date('date_min'));
@@ -627,28 +728,86 @@ class RechercheController extends Controller
                 $query->whereDate('date_fdi', '<=', $request->date('date_max'));
             }
 
+            // Tri
+            if ($request->filled('sort')) {
+                $sortParts = explode(',', $request->input('sort'));
+                $sortField = $sortParts[0] ?? 'date_fdi';
+                $sortDirection = strtolower($sortParts[1] ?? 'desc');
+                
+                // Mapping des champs de tri
+                $sortMapping = [
+                    'date_fdi' => 'date_fdi',
+                    'numero_fdi' => 'numero_fdi',
+                    'importateur' => 'importateur',
+                    'banque' => 'banque',
+                    'valeur_caf' => 'valeur_caf',
+                    'valeur_fob_cfa' => 'valeur_fob_cfa',
+                ];
+                
+                $sortField = $sortMapping[$sortField] ?? 'date_fdi';
+                $sortDirection = in_array($sortDirection, ['asc', 'desc']) ? $sortDirection : 'desc';
+                
+                $query->orderBy($sortField, $sortDirection);
+            } else {
+                $query->orderBy('date_fdi', 'desc');
+            }
+
             $perPage = min($request->integer('per_page', 15), 100);
-            $results = $query->paginate($perPage);
+            $page = $request->integer('page', 1);
+            $results = $query->paginate($perPage, ['*'], 'page', $page);
+
+            // Construire le message avec les filtres appliqués
+            $filtersText = $this->buildFiltersText($request, [
+                'search' => 'recherche textuelle',
+                'numero_fdi' => 'numero_fdi',
+                'numero_fdi_complet' => 'numero_fdi_complet',
+                'reference_facture' => 'reference_facture',
+                'banque' => 'banque',
+                'importateur' => 'importateur',
+                'date_min' => 'date_min',
+                'date_max' => 'date_max',
+            ]);
 
             $message = $results->total() > 0
-                ? "{$results->total()} FDI trouvée(s)"
-                : 'Aucune FDI trouvée';
+                ? "{$results->total()} FDI trouvée(s)" . ($filtersText ? " avec filtre(s): {$filtersText}" : '')
+                : 'Aucune FDI trouvée' . ($filtersText ? " avec filtre(s): {$filtersText}" : '');
+
+            // Enrichir les données avec numero_fdi_complet et identifiant
+            $data = $results->map(function ($fdi) {
+                return array_merge($fdi->toArray(), [
+                    'numero_fdi_complet' => $fdi->numero_fdi_complet,
+                    'identifiant' => $fdi->identifiant,
+                ]);
+            })->toArray();
 
             return [
                 'status' => 200,
                 'message' => $message,
-                'data' => $results->items(),
+                'data' => $data,
                 'meta' => [
                     'current_page' => $results->currentPage(),
                     'last_page' => $results->lastPage(),
                     'per_page' => $results->perPage(),
                     'total' => $results->total(),
+                    'from' => $results->firstItem(),
+                    'to' => $results->lastItem(),
+                ],
+                'links' => [
+                    'first' => $results->url(1),
+                    'last' => $results->url($results->lastPage()),
+                    'prev' => $results->previousPageUrl(),
+                    'next' => $results->nextPageUrl(),
                 ],
             ];
         });
 
         // Log audit
-        AuditService::log('search', "Recherche de FDI effectuée", 'FdiSg');
+        $filtersText = $this->buildFiltersText($request, [
+            'search' => 'recherche textuelle',
+            'numero_fdi' => 'numero_fdi',
+            'numero_fdi_complet' => 'numero_fdi_complet',
+        ]);
+        AuditService::log('search', "Recherche de FDI effectuée" . ($filtersText ? " ({$filtersText})" : ''), 'FdiSg');
 
         return response()->json($payload);
     }
@@ -855,6 +1014,10 @@ class RechercheController extends Controller
         return 'fdi_general';
     }
 }
+
+
+
+
 
 
 

@@ -8,11 +8,110 @@ use App\Models\AuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use OpenApi\Annotations as OA;
 
+/**
+ * @OA\Tag(
+ *     name="Audit Logs",
+ *     description="Gestion des journaux d audit : consultation, filtrage par utilisateur, modele, action et dates, groupement par date."
+ * )
+ */
 class AuditLogController extends Controller
 {
     /**
-     * Display a listing of audit logs.
+     * @OA\Get(
+     *     path="/api/audit-logs",
+     *     summary="Lister les journaux d audit",
+     *     description="Recupere une liste paginee des journaux d audit avec possibilite de filtrage par action, utilisateur, type de modele, dates et recherche. Supporte le groupement par date.",
+     *     operationId="listAuditLogs",
+     *     tags={"Audit Logs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="action",
+     *         in="query",
+     *         description="Filtrer par action (peut etre multiple, separees par virgule)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="create,update,delete")
+     *     ),
+     *     @OA\Parameter(
+     *         name="user_id",
+     *         in="query",
+     *         description="Filtrer par ULID de l utilisateur",
+     *         required=false,
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Parameter(
+     *         name="model_type",
+     *         in="query",
+     *         description="Filtrer par type de modele (ex: User, Role, Permission)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="User")
+     *     ),
+     *     @OA\Parameter(
+     *         name="start_date",
+     *         in="query",
+     *         description="Date de debut (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-01-01")
+     *     ),
+     *     @OA\Parameter(
+     *         name="end_date",
+     *         in="query",
+     *         description="Date de fin (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-12-31")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans la description",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="group_by_date",
+     *         in="query",
+     *         description="Grouper les resultats par date",
+     *         required=false,
+     *         @OA\Schema(type="boolean", default=false)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des journaux d audit",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="150 journal(aux) d audit trouve(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=10),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=150)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -125,7 +224,32 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Display the specified audit log.
+     * @OA\Get(
+     *     path="/api/audit-logs/{id}",
+     *     summary="Afficher un journal d audit",
+     *     description="Recupere les details complets d un journal d audit specifique, incluant les informations sur l utilisateur associe.",
+     *     operationId="showAuditLog",
+     *     tags={"Audit Logs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID du journal d audit",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Details du journal d audit",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Journal d audit charge"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Journal d audit non trouve")
+     * )
      */
     public function show(string $id): JsonResponse
     {
@@ -161,7 +285,86 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Get audit logs for a specific user
+     * @OA\Get(
+     *     path="/api/audit-logs/user/{userId}",
+     *     summary="Recuperer les journaux d audit d un utilisateur",
+     *     description="Recupere tous les journaux d audit pour un utilisateur specifique. Par defaut, les resultats sont groupes par date. Supporte le filtrage par action et dates.",
+     *     operationId="getUserAuditLogs",
+     *     tags={"Audit Logs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="userId",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="action",
+     *         in="query",
+     *         description="Filtrer par action (peut etre multiple, separees par virgule)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="create,update")
+     *     ),
+     *     @OA\Parameter(
+     *         name="start_date",
+     *         in="query",
+     *         description="Date de debut (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-01-01")
+     *     ),
+     *     @OA\Parameter(
+     *         name="end_date",
+     *         in="query",
+     *         description="Date de fin (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-12-31")
+     *     ),
+     *     @OA\Parameter(
+     *         name="group_by_date",
+     *         in="query",
+     *         description="Grouper les resultats par date (par defaut: true)",
+     *         required=false,
+     *         @OA\Schema(type="boolean", default=true)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Journaux d audit de l utilisateur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="25 activite(s) enregistree(s) pour cet utilisateur"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=2),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=25)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function userLogs(string $userId, Request $request): JsonResponse
     {
@@ -258,7 +461,32 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Get available action types for filtering
+     * @OA\Get(
+     *     path="/api/audit-logs/action-types",
+     *     summary="Recuperer les types d actions disponibles",
+     *     description="Recupere la liste de tous les types d actions distincts disponibles dans les journaux d audit, avec leurs libelles en francais pour le filtrage.",
+     *     operationId="getAuditLogActionTypes",
+     *     tags={"Audit Logs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des types d actions",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="12 type(s) d action disponible(s) pour le filtrage"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="value", type="string", example="create"),
+     *                     @OA\Property(property="label", type="string", example="Creation")
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function getActionTypes(): JsonResponse
     {
@@ -306,7 +534,50 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Get audit logs for a specific model
+     * @OA\Get(
+     *     path="/api/audit-logs/model/{modelType}/{modelId}",
+     *     summary="Recuperer les journaux d audit d un modele specifique",
+     *     description="Recupere tous les journaux d audit associes a un modele specifique (ex: User, Role, Permission) et son ID.",
+     *     operationId="getModelAuditLogs",
+     *     tags={"Audit Logs"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="modelType",
+     *         in="path",
+     *         required=true,
+     *         description="Type du modele (ex: User, Role, Permission)",
+     *         @OA\Schema(type="string", example="User")
+     *     ),
+     *     @OA\Parameter(
+     *         name="modelId",
+     *         in="path",
+     *         required=true,
+     *         description="ID du modele (peut etre un entier ou un ULID selon le type)",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Journaux d audit du modele",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="8 journal(aux) d audit trouve(s) pour ce User"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=1),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=8)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function modelLogs(string $modelType, string $modelId): JsonResponse
     {

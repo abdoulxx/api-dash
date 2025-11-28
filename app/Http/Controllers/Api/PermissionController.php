@@ -13,11 +13,75 @@ use App\Models\Permission;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Support\CacheTagger;
+use OpenApi\Annotations as OA;
 
+/**
+ * @OA\Tag(
+ *     name="Permissions",
+ *     description="Gestion complete des permissions : CRUD, assignation aux roles et utilisateurs, structure hierarchique, restauration et suppression definitive."
+ * )
+ */
 class PermissionController extends Controller
 {
     /**
-     * Display a listing of all permissions.
+     * @OA\Get(
+     *     path="/api/permissions",
+     *     summary="Lister les permissions",
+     *     description="Recupere une liste paginee des permissions avec possibilite de recherche. Supporte le format flat (par defaut) ou hierarchical via le parametre format.",
+     *     operationId="listPermissions",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans le nom de la permission",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="format",
+     *         in="query",
+     *         description="Format de retour (flat ou hierarchical). Si hierarchical, redirige vers /api/permissions/hierarchical",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"flat", "hierarchical"}, default="flat")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des permissions",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="50 permission(s) disponible(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=4),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=50)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -62,7 +126,50 @@ class PermissionController extends Controller
     }
 
     /**
-     * Get permissions in hierarchical structure (module/page/action)
+     * @OA\Get(
+     *     path="/api/permissions/hierarchical",
+     *     summary="Lister les permissions en structure hierarchique",
+     *     description="Recupere toutes les permissions organisees en structure hierarchique (Module/Page/Action). Les permissions qui ne suivent pas ce format sont placees dans la categorie Other.",
+     *     operationId="getHierarchicalPermissions",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Structure hierarchique des permissions",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Structure hierarchique chargee : 5 module(s), 50 permission(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="name", type="string", example="Accueil"),
+     *                     @OA\Property(
+     *                         property="pages",
+     *                         type="array",
+     *                         @OA\Items(
+     *                             type="object",
+     *                             @OA\Property(property="name", type="string", example="Page Accueil"),
+     *                             @OA\Property(
+     *                                 property="actions",
+     *                                 type="array",
+     *                                 @OA\Items(
+     *                                     type="object",
+     *                                     @OA\Property(property="id", type="integer", example=1),
+     *                                     @OA\Property(property="name", type="string", example="Accueil/Page Accueil/Rechercher"),
+     *                                     @OA\Property(property="action", type="string", example="Rechercher"),
+     *                                     @OA\Property(property="guard_name", type="string", example="web")
+     *                                 )
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function getHierarchical(): JsonResponse
     {
@@ -136,7 +243,51 @@ class PermissionController extends Controller
     }
 
     /**
-     * Assign permissions to a role
+     * @OA\Post(
+     *     path="/api/permissions/roles/{roleId}/assign",
+     *     summary="Assigner des permissions a un role",
+     *     description="Assigne des permissions a un role. Les permissions fournies remplacent toutes les permissions existantes du role (sync).",
+     *     operationId="assignPermissionsToRole",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="roleId",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"permissions"},
+     *             @OA\Property(
+     *                 property="permissions",
+     *                 type="array",
+     *                 @OA\Items(type="string"),
+     *                 example={"view users", "edit users", "delete users"},
+     *                 description="Tableau de noms de permissions"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permissions assignees avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="5 permission(s) assignee(s) au role admin"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="role", type="string", example="admin"),
+     *                 @OA\Property(property="permissions", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role non trouve"),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function assignToRole(AssignPermissionRequest $request, int $roleId): JsonResponse
     {
@@ -164,7 +315,51 @@ class PermissionController extends Controller
     }
 
     /**
-     * Assign permissions directly to a user
+     * @OA\Post(
+     *     path="/api/permissions/users/{userId}/assign",
+     *     summary="Assigner des permissions a un utilisateur",
+     *     description="Assigne des permissions directement a un utilisateur. Les permissions fournies remplacent toutes les permissions directes existantes de l utilisateur (sync).",
+     *     operationId="assignPermissionsToUser",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="userId",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"permissions"},
+     *             @OA\Property(
+     *                 property="permissions",
+     *                 type="array",
+     *                 @OA\Items(type="string"),
+     *                 example={"view dashboard", "export data"},
+     *                 description="Tableau de noms de permissions"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permissions assignees avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="3 permission(s) assignee(s) a Jean Dupont"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="user", type="string", example="Jean Dupont"),
+     *                 @OA\Property(property="permissions", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve"),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function assignToUser(AssignPermissionRequest $request, string $userId): JsonResponse
     {
@@ -196,7 +391,47 @@ class PermissionController extends Controller
     }
 
     /**
-     * Get all permissions for a specific role
+     * @OA\Get(
+     *     path="/api/permissions/roles/{roleId}",
+     *     summary="Recuperer les permissions d un role",
+     *     description="Recupere toutes les permissions assignees a un role specifique. Supporte deux formats : flat (par defaut) ou hierarchical.",
+     *     operationId="getRolePermissions",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="roleId",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="format",
+     *         in="query",
+     *         description="Format de retour (flat ou hierarchical)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"flat", "hierarchical"}, default="flat")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permissions du role",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Le role admin possede 15 permission(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="role", type="string", example="admin"),
+     *                 @OA\Property(property="role_id", type="integer", example=1),
+     *                 @OA\Property(property="description", type="string", nullable=true),
+     *                 @OA\Property(property="permissions", type="array", @OA\Items(type="object")),
+     *                 @OA\Property(property="permission_names", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role non trouve")
+     * )
      */
     public function getRolePermissions(int $roleId): JsonResponse
     {
@@ -273,7 +508,38 @@ class PermissionController extends Controller
     }
 
     /**
-     * Get all permissions for a specific user
+     * @OA\Get(
+     *     path="/api/permissions/users/{userId}",
+     *     summary="Recuperer les permissions d un utilisateur",
+     *     description="Recupere toutes les permissions d un utilisateur, incluant les permissions directes et celles obtenues via les roles.",
+     *     operationId="getUserPermissions",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="userId",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l utilisateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permissions de l utilisateur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Jean Dupont : 20 permission(s) (5 directe(s), 15 via role(s))"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="user", type="string", example="Jean Dupont"),
+     *                 @OA\Property(property="direct_permissions", type="array", @OA\Items(type="object")),
+     *                 @OA\Property(property="role_permissions", type="array", @OA\Items(type="object"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Utilisateur non trouve")
+     * )
      */
     public function getUserPermissions(string $userId): JsonResponse
     {
@@ -302,7 +568,33 @@ class PermissionController extends Controller
     }
 
     /**
-     * Create a new permission
+     * @OA\Post(
+     *     path="/api/permissions",
+     *     summary="Creer une nouvelle permission",
+     *     description="Cree une nouvelle permission avec un nom unique. Le guard_name par defaut est web.",
+     *     operationId="createPermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name"},
+     *             @OA\Property(property="name", type="string", example="view reports", description="Nom unique de la permission"),
+     *             @OA\Property(property="guard_name", type="string", example="web", default="web", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Permission creee avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=201),
+     *             @OA\Property(property="message", type="string", example="La permission view reports a ete ajoutee"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Erreur de validation (nom deja existant)")
+     * )
      */
     public function store(Request $request): JsonResponse
     {
@@ -330,7 +622,32 @@ class PermissionController extends Controller
     }
 
     /**
-     * Display the specified permission.
+     * @OA\Get(
+     *     path="/api/permissions/{id}",
+     *     summary="Afficher une permission",
+     *     description="Recupere les details d une permission specifique.",
+     *     operationId="showPermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID de la permission",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Details de la permission",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Permission view reports chargee"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Permission non trouvee")
+     * )
      */
     public function show(int $id): JsonResponse
     {
@@ -344,7 +661,41 @@ class PermissionController extends Controller
     }
 
     /**
-     * Update an existing permission.
+     * @OA\Put(
+     *     path="/api/permissions/{id}",
+     *     summary="Modifier une permission",
+     *     description="Met a jour le nom et/ou le guard_name d une permission existante. Le nom doit rester unique.",
+     *     operationId="updatePermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID de la permission",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name"},
+     *             @OA\Property(property="name", type="string", example="view reports updated", description="Nouveau nom unique de la permission"),
+     *             @OA\Property(property="guard_name", type="string", example="web", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permission modifiee avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La permission view reports updated a ete mise a jour"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Permission non trouvee"),
+     *     @OA\Response(response=422, description="Erreur de validation (nom deja existant)")
+     * )
      */
     public function update(Request $request, int $id): JsonResponse
     {
@@ -374,7 +725,31 @@ class PermissionController extends Controller
     }
 
     /**
-     * Delete a permission (soft delete)
+     * @OA\Delete(
+     *     path="/api/permissions/{id}",
+     *     summary="Supprimer une permission (soft delete)",
+     *     description="Supprime une permission de maniere logique (soft delete). La permission peut etre restauree ulterieurement.",
+     *     operationId="deletePermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID de la permission",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permission supprimee avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La permission view reports a ete supprimee (peut etre restauree)")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Permission non trouvee")
+     * )
      */
     public function destroy(int $id): JsonResponse
     {
@@ -394,7 +769,57 @@ class PermissionController extends Controller
     }
 
     /**
-     * List trashed permissions
+     * @OA\Get(
+     *     path="/api/permissions/trashed/list",
+     *     summary="Lister les permissions supprimees",
+     *     description="Recupere une liste paginee des permissions supprimees (soft delete) avec possibilite de recherche.",
+     *     operationId="listTrashedPermissions",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans le nom de la permission",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des permissions supprimees",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="5 permission(s) supprimee(s) trouvee(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=1),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=5)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function trashed(Request $request): JsonResponse
     {
@@ -429,7 +854,32 @@ class PermissionController extends Controller
     }
 
     /**
-     * Restore a trashed permission
+     * @OA\Post(
+     *     path="/api/permissions/{id}/restore",
+     *     summary="Restaurer une permission supprimee",
+     *     description="Restaure une permission qui a ete supprimee (soft delete).",
+     *     operationId="restorePermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID de la permission a restaurer",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permission restauree avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La permission view reports a ete restauree avec succes"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Permission supprimee non trouvee")
+     * )
      */
     public function restore(int $id): JsonResponse
     {
@@ -449,7 +899,31 @@ class PermissionController extends Controller
     }
 
     /**
-     * Permanently delete a permission
+     * @OA\Delete(
+     *     path="/api/permissions/{id}/force",
+     *     summary="Supprimer definitivement une permission",
+     *     description="Supprime definitivement une permission de la base de donnees. Cette action est irreversible. La permission doit etre deja supprimee (soft delete) pour pouvoir etre supprimee definitivement.",
+     *     operationId="forceDeletePermission",
+     *     tags={"Permissions"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID de la permission a supprimer definitivement",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Permission supprimee definitivement",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La permission view reports a ete supprimee definitivement")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Permission supprimee non trouvee")
+     * )
      */
     public function forceDelete(int $id): JsonResponse
     {

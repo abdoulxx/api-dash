@@ -45,8 +45,14 @@ return [
                  * Absolute paths to directory containing the swagger annotations are stored.
                  */
                 'annotations' => [
-                    base_path('app'),
-                    base_path('routes'),
+                    // Limitation temporaire pour éviter l'erreur de parsing
+                    // TODO: Identifier et corriger le fichier problématique
+                    base_path('app/Http/Controllers/Api/UserController.php'),
+                    base_path('app/Http/Controllers/Api/AdminController.php'),
+                    base_path('app/Http/Controllers/Api/RoleController.php'),
+                    base_path('app/Http/Controllers/Api/PermissionController.php'),
+                    base_path('app/Http/Controllers/Api/AuditLogController.php'),
+                    base_path('app/Swagger'),
                 ],
             ],
         ],
@@ -158,7 +164,20 @@ return [
              * @note This option overwrites `paths.excludes`
              * @see \OpenApi\scan
              */
-            'exclude' => [],
+            'exclude' => [
+                // Exclusion temporaire pour éviter l'erreur de parsing "unexpected T_PRIVATE on line 525"
+                // TODO: Identifier et corriger le fichier problématique qui cause cette erreur
+                base_path('app/Services'),
+                base_path('app/Http/Controllers/Api/ManifesteSgController.php'),
+                base_path('app/Http/Controllers/Api/FdiSgController.php'),
+                base_path('app/Http/Controllers/Api/DeclarationSgController.php'),
+                base_path('app/Http/Controllers/Api/BanqueSadController.php'),
+                base_path('app/Http/Controllers/Api/BanqueTvfController.php'),
+                base_path('app/Http/Controllers/Api/BonProvisoireSgController.php'),
+                base_path('app/Http/Controllers/Api/CacheController.php'),
+                base_path('app/Http/Controllers/Api/FcvrSgController.php'),
+                base_path('app/Http/Controllers/Api/RechercheController.php'),
+            ],
 
             /*
              * Allows to generate specs either for OpenAPI 3.0.0 or OpenAPI 3.1.0.
@@ -314,7 +333,7 @@ return [
          * Constants which can be used in annotations
          */
         'constants' => [
-            'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', config('app.url', 'http://localhost:8000')),
+            'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', 'http://localhost:8000/api'),
         ],
     ],
 ];

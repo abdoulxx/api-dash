@@ -32,12 +32,12 @@ class RechercheAvanceeService
     {
         return [
             'option_1' => [
-                [
-                    'value' => 'FDI',
-                    'label' => 'FDI',
-                    'fields' => ['numero_fdi', 'annee', 'bureau', 'importateur'],
-                    'description' => 'Recherche par numéro FDI, année, bureau ou importateur'
-                ],
+            [
+                'value' => 'FDI',
+                'label' => 'FDI',
+                'fields' => ['numero_fdi', 'annee', 'bureau', 'importateur'],
+                'description' => 'Recherche par numéro FDI, année, bureau ou importateur'
+            ],
                 [
                     'value' => 'RFCV',
                     'label' => 'RFCV',
@@ -64,15 +64,15 @@ class RechercheAvanceeService
                 ]
             ],
             'option_2' => [
-                [
-                    'value' => 'Importateur',
-                    'label' => 'Importateur',
+            [
+                'value' => 'Importateur',
+                'label' => 'Importateur',
                     'fields' => ['importateur', 'cc', 'nom_importateur'],
-                    'description' => 'Recherche par nom d\'importateur ou code importateur'
-                ],
-                [
-                    'value' => 'Manifeste',
-                    'label' => 'Manifeste',
+                'description' => 'Recherche par nom d\'importateur ou code importateur'
+            ],
+            [
+                'value' => 'Manifeste',
+                'label' => 'Manifeste',
                     'fields' => ['num_manifeste', 'numero_manifeste_complet', 'num_voyage', 'nom_moyen_transport'],
                     'description' => 'Recherche par numéro de manifeste complet, voyage ou moyen de transport'
                 ],
@@ -782,12 +782,45 @@ class RechercheAvanceeService
 
     /**
      * Construit le diagramme de flux à partir d'une recherche FDI
+     * Relations selon s360_analyse :
+     * - FDI → FCVR (via NUM_FDI et DATE_FDI)
+     * - FCVR → Manifeste (via NUM_VOYAGE et NUM_BL)
+     * - FCVR → Déclaration (via NUM_DECLARATION)
+     * - Manifeste → Déclaration (via NUM_MANIFESTE et NUM_BL)
+     * - FDI → Banque TVF (via NUM_FDI et DATE_FDI)
+     * - Déclaration → Banque SAD (via REF_DDU)
+     * - Déclaration → Bon Provisoire (via NUM_DECLARATION)
      */
     private function buildFlowDiagramFromFdi(string $valeur, array $filters): array
     {
-        $fdi = FdiSg::where('numero_fdi', 'like', "%{$valeur}%")
-            ->orWhere('importateur', 'like', "%{$valeur}%")
-            ->first();
+        // Rechercher la FDI par numero_fdi ou numero_fdi_complet
+        $driver = DB::getDriverName();
+        $fdi = FdiSg::where(function ($q) use ($valeur, $driver) {
+            $q->where('numero_fdi', 'like', "%{$valeur}%")
+              ->orWhere('importateur', 'like', "%{$valeur}%");
+            
+            // Recherche dans le numero_fdi_complet construit (convertir les entiers en text pour PostgreSQL)
+            if ($driver === 'pgsql') {
+                $q->orWhereRaw("CONCAT(COALESCE(CAST(annee AS TEXT), ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(CAST(numero_serie AS TEXT), '')) LIKE ?", ["%{$valeur}%"]);
+            } else {
+                $q->orWhereRaw("CONCAT(COALESCE(annee, ''), COALESCE(bureau, ''), COALESCE(serie_fdi, ''), COALESCE(numero_serie, '')) LIKE ?", ["%{$valeur}%"]);
+            }
+            
+            // Si la valeur correspond au format "ANNEEBUREAUSERIENUMERO", recherche exacte
+            if (preg_match('/^(\d{4})([A-Z0-9]+)([A-Z])(\d+)$/', trim($valeur), $matches)) {
+                $annee = (int) $matches[1];
+                $bureau = $matches[2];
+                $serie = $matches[3];
+                $numero = $matches[4];
+                
+                $q->orWhere(function ($subQ) use ($annee, $bureau, $serie, $numero) {
+                    $subQ->where('annee', $annee)
+                         ->where('bureau', $bureau)
+                         ->where('serie_fdi', $serie)
+                         ->where('numero_serie', $numero);
+                });
+            }
+        })->first();
 
         if (!$fdi) {
             return ['nodes' => [], 'edges' => []];
@@ -795,93 +828,265 @@ class RechercheAvanceeService
 
         $nodes = [];
         $edges = [];
+        $processedNodes = []; // Pour éviter les doublons
+
+        // Date de référence pour calculer les délais (date FDI)
+        $fdiReferenceDate = $fdi->date_fdi ?? new \DateTime();
 
         // Node FDI (existe → vert)
+        $fdiNodeId = "fdi_{$fdi->ulid}";
         $nodes[] = [
-            'id' => "fdi_{$fdi->ulid}",
+            'id' => $fdiNodeId,
             'type' => 'FDI',
-            'label' => $fdi->numero_fdi,
+            'label' => $fdi->numero_fdi_complet ?? $fdi->numero_fdi,
             'count' => 1,
             'ulid' => $fdi->ulid,
-            'color' => $this->calculateNodeColor('FDI', true, $fdi->date_fdi)
+            'color' => $this->calculateNodeColor('FDI', true, $fdiReferenceDate)
         ];
+        $processedNodes['fdi'] = $fdiNodeId;
 
-        // RFCV liées
-        $fcvr = FcvrSg::where('num_fdi', $fdi->numero_fdi)->first();
-        $fcvrExists = $fcvr !== null;
-        $fcvrReferenceDate = $fdi->date_fdi; // Date de référence = date FDI
+        // 1. FCVR liées (via NUM_FDI et DATE_FDI) - selon s360_analyse
+        $fcvrList = FcvrSg::where('num_fdi', $fdi->numero_fdi)
+            ->where('date_fdi', $fdi->date_fdi)
+            ->get();
         
-        $fcvrNodeId = "fcvr_" . ($fcvr ? $fcvr->ulid : 'missing');
-        $nodes[] = [
-            'id' => $fcvrNodeId,
-            'type' => 'RFCV',
-            'label' => $fcvr ? $fcvr->num_rfcv : 'FCVR manquante',
-            'count' => $fcvrExists ? 1 : 0,
-            'ulid' => $fcvr ? $fcvr->ulid : null,
-            'color' => $this->calculateNodeColor('FCVR', $fcvrExists, $fcvrReferenceDate)
-        ];
+        $fcvrExists = $fcvrList->isNotEmpty();
+        $fcvrReferenceDate = $fdiReferenceDate; // Date de référence = date FDI
         
         if ($fcvrExists) {
+            foreach ($fcvrList as $fcvr) {
+                $fcvrNodeId = "fcvr_{$fcvr->ulid}";
+                if (!in_array($fcvrNodeId, $processedNodes)) {
+            $nodes[] = [
+                        'id' => $fcvrNodeId,
+                'type' => 'RFCV',
+                        'label' => $fcvr->num_rfcv ?? 'FCVR',
+                'count' => 1,
+                'ulid' => $fcvr->ulid,
+                        'color' => $this->calculateNodeColor('FCVR', true, $fcvrReferenceDate)
+            ];
+                    $processedNodes['fcvr_' . $fcvr->ulid] = $fcvrNodeId;
+                    
             $edges[] = [
-                'from' => "fdi_{$fdi->ulid}",
-                'to' => $fcvrNodeId,
+                        'from' => $fdiNodeId,
+                        'to' => $fcvrNodeId,
                 'relation' => 'num_fdi',
                 'type' => 'has_fcvr'
             ];
+                }
+            }
+        } else {
+            // FCVR manquante
+            $fcvrMissingNodeId = "fcvr_missing_{$fdi->ulid}";
+            $nodes[] = [
+                'id' => $fcvrMissingNodeId,
+                'type' => 'RFCV',
+                'label' => 'FCVR manquante',
+                'count' => 0,
+                'ulid' => null,
+                'color' => $this->calculateNodeColor('FCVR', false, $fcvrReferenceDate)
+            ];
         }
 
-        // Manifeste lié via BL
-        if ($fcvr && $fcvr->num_bl) {
-            $manifesteTt = ManifesteTt::where('num_titre_transport', $fcvr->num_bl)->first();
-            if ($manifesteTt) {
-                $manifeste = ManifesteSg::where('num_manifeste', $manifesteTt->num_manifeste)->first();
-                $manifesteExists = $manifeste !== null;
-                $manifesteReferenceDate = $manifeste ? ($manifeste->date_arrivee_navire ?? $manifeste->date_manifeste ?? new \DateTime()) : new \DateTime();
-                
-                $manifesteId = $manifeste ? ($manifeste->ulid ?? $manifeste->instance_id) : 'missing';
-                $manifesteNodeId = "manifeste_{$manifesteId}";
-                $nodes[] = [
-                    'id' => $manifesteNodeId,
-                    'type' => 'Manifeste',
-                    'label' => $manifeste ? $manifeste->num_manifeste : 'Manifeste manquant',
-                    'count' => $manifesteExists ? 1 : 0,
-                    'ulid' => $manifeste ? ($manifeste->ulid ?? null) : null,
-                    'color' => $this->calculateNodeColor('Manifeste', $manifesteExists, $manifesteReferenceDate)
-                ];
-                
-                if ($fcvrExists && $manifesteExists) {
-                    $edges[] = [
-                        'from' => $fcvrNodeId,
-                        'to' => $manifesteNodeId,
-                        'relation' => 'num_bl',
-                        'type' => 'has_manifeste'
-                    ];
-                }
+        // 2. Banque TVF liée (via NUM_FDI et DATE_FDI) - selon s360_analyse
+        $banqueTvf = BanqueTvf::where('num_fdi', $fdi->numero_fdi)
+            ->where('date_fdi', $fdi->date_fdi)
+            ->first();
+        
+        $banqueTvfExists = $banqueTvf !== null;
+        $banqueTvfReferenceDate = $fdiReferenceDate; // Date de référence = date FDI
+        
+        $banqueTvfNodeId = "banque_tvf_" . ($banqueTvf ? $banqueTvf->ulid : "missing_{$fdi->ulid}");
+        $nodes[] = [
+            'id' => $banqueTvfNodeId,
+            'type' => 'AC',
+            'label' => $banqueTvf ? ($banqueTvf->num_demande_ac ?? 'AC TVF') : 'AC TVF manquante',
+            'count' => $banqueTvfExists ? 1 : 0,
+            'ulid' => $banqueTvf ? $banqueTvf->ulid : null,
+            'color' => $this->calculateNodeColor('BanqueTvf', $banqueTvfExists, $banqueTvfReferenceDate)
+        ];
+        
+        if ($banqueTvfExists) {
+            $edges[] = [
+                'from' => $fdiNodeId,
+                'to' => $banqueTvfNodeId,
+                'relation' => 'num_fdi',
+                'type' => 'has_banque_tvf'
+            ];
+        }
 
-                // Déclaration liée
-                $declaration = $manifeste ? DeclarationSg::where('num_manifeste', $manifeste->num_manifeste)->first() : null;
-                $declarationExists = $declaration !== null;
-                $declarationReferenceDate = $manifeste ? ($manifeste->date_arrivee_navire ?? $manifeste->date_manifeste ?? new \DateTime()) : new \DateTime();
+        // 3. Manifestes liés via FCVR (NUM_VOYAGE et NUM_BL) - selon s360_analyse
+        $processedManifestes = [];
+        foreach ($fcvrList as $fcvr) {
+            if ($fcvr->num_bl && $fcvr->num_voyage) {
+                $manifesteTt = ManifesteTt::where('num_titre_transport', $fcvr->num_bl)
+                    ->where('num_voy_ds', $fcvr->num_voyage)
+                    ->first();
                 
-                $declarationId = $declaration ? ($declaration->ulid ?? $declaration->id) : 'missing';
-                $declarationNodeId = "declaration_{$declarationId}";
+                if ($manifesteTt) {
+                    $manifeste = ManifesteSg::where('num_manifeste', $manifesteTt->num_manifeste)->first();
+                    $manifesteExists = $manifeste !== null;
+                    $manifesteReferenceDate = $manifeste ? ($manifeste->date_arrivee_navire ?? $manifeste->date_manifeste ?? new \DateTime()) : new \DateTime();
+                    
+                    $manifesteId = $manifeste ? ($manifeste->ulid ?? $manifeste->instance_id) : 'missing';
+                    $manifesteNodeId = "manifeste_{$manifesteId}";
+                    
+                    if (!in_array($manifesteNodeId, $processedManifestes)) {
+                        $nodes[] = [
+                            'id' => $manifesteNodeId,
+                            'type' => 'Manifeste',
+                            'label' => $manifeste ? $manifeste->num_manifeste : 'Manifeste manquant',
+                            'count' => $manifesteExists ? 1 : 0,
+                            'ulid' => $manifeste ? ($manifeste->ulid ?? null) : null,
+                            'color' => $this->calculateNodeColor('Manifeste', $manifesteExists, $manifesteReferenceDate)
+                        ];
+                        $processedManifestes[] = $manifesteNodeId;
+                        
+                        if ($fcvrExists) {
+                            $fcvrNodeId = "fcvr_{$fcvr->ulid}";
+                        $edges[] = [
+                                'from' => $fcvrNodeId,
+                                'to' => $manifesteNodeId,
+                            'relation' => 'num_bl',
+                            'type' => 'has_manifeste'
+                        ];
+                        }
+
+                        // 4. Déclarations liées au Manifeste (via NUM_MANIFESTE et NUM_BL) - selon s360_analyse
+                        $declarations = $manifeste ? DeclarationSg::where('num_manifeste', $manifeste->num_manifeste)
+                            ->where('num_bl', $fcvr->num_bl)
+                            ->get() : collect();
+                        
+                        $declarationReferenceDate = $manifesteReferenceDate;
+                        
+                        if ($declarations->isNotEmpty()) {
+                            foreach ($declarations as $declaration) {
+                            $declarationId = $declaration->ulid ?? $declaration->id;
+                                $declarationNodeId = "declaration_{$declarationId}";
+                                if (!in_array($declarationNodeId, $processedNodes)) {
+                            $nodes[] = [
+                                        'id' => $declarationNodeId,
+                                'type' => 'Declaration',
+                                'label' => $declaration->declaration,
+                                'count' => 1,
+                                'ulid' => $declaration->ulid ?? null,
+                                        'color' => $this->calculateNodeColor('Declaration', true, $declarationReferenceDate)
+                            ];
+                                    $processedNodes['declaration_' . $declarationId] = $declarationNodeId;
+                                    
+                            $edges[] = [
+                                        'from' => $manifesteNodeId,
+                                        'to' => $declarationNodeId,
+                                'relation' => 'num_manifeste',
+                                'type' => 'has_declaration'
+                                    ];
+
+                                    // 5. Banque SAD liée à la Déclaration (via REF_DDU) - selon s360_analyse
+                                    $banqueSad = BanqueSad::where('ref_ddu', $declaration->declaration)->first();
+                                    $banqueSadExists = $banqueSad !== null;
+                                    $banqueSadReferenceDate = $declaration->date_declaration ?? $declarationReferenceDate;
+                                    
+                                    $banqueSadId = $banqueSad ? $banqueSad->ulid : "missing_{$declarationId}";
+                                    $banqueSadNodeId = "banque_sad_{$banqueSadId}";
+                                    if (!in_array($banqueSadNodeId, $processedNodes)) {
+                                        $nodes[] = [
+                                            'id' => $banqueSadNodeId,
+                                            'type' => 'AC',
+                                            'label' => $banqueSad ? ($banqueSad->num_ddu ?? 'AC SAD') : 'AC SAD manquante',
+                                            'count' => $banqueSadExists ? 1 : 0,
+                                            'ulid' => $banqueSad ? $banqueSad->ulid : null,
+                                            'color' => $this->calculateNodeColor('BanqueSad', $banqueSadExists, $banqueSadReferenceDate)
+                                        ];
+                                        $processedNodes['banque_sad_' . $banqueSadId] = $banqueSadNodeId;
+                                        
+                                        if ($banqueSadExists) {
+                                            $edges[] = [
+                                                'from' => $declarationNodeId,
+                                                'to' => $banqueSadNodeId,
+                                                'relation' => 'ref_ddu',
+                                                'type' => 'has_banque_sad'
+                                            ];
+                                        }
+                                    }
+
+                                    // 6. Bon Provisoire lié à la Déclaration (via NUM_DECLARATION) - selon s360_analyse
+                                    $bonProvisoireArticles = BonProvisoireArticle::where('num_declaration', $declaration->declaration)->get();
+                                    
+                                    if ($bonProvisoireArticles->isNotEmpty()) {
+                                        foreach ($bonProvisoireArticles as $bpArticle) {
+                                            $bonProvisoire = BonProvisoireSg::where('numero_bon_provisoire', $bpArticle->numero_bon_provisoire)->first();
+                                            $bpExists = $bonProvisoire !== null;
+                                            $bpReferenceDate = $declaration->date_declaration ?? $declarationReferenceDate;
+                                            
+                                            $bpId = $bonProvisoire ? ($bonProvisoire->ulid ?? $bonProvisoire->id) : "missing_{$declarationId}";
+                                            $bpNodeId = "bon_provisoire_{$bpId}";
+                                            if (!in_array($bpNodeId, $processedNodes)) {
+                                                $nodes[] = [
+                                                    'id' => $bpNodeId,
+                                                    'type' => 'BonProvisoire',
+                                                    'label' => $bonProvisoire ? ($bonProvisoire->numero_bon_provisoire_complet ?? 'BP') : 'Bon Provisoire manquant',
+                                                    'count' => $bpExists ? 1 : 0,
+                                                    'ulid' => $bonProvisoire ? ($bonProvisoire->ulid ?? null) : null,
+                                                    'color' => $this->calculateNodeColor('BonProvisoire', $bpExists, $bpReferenceDate)
+                                                ];
+                                                $processedNodes['bon_provisoire_' . $bpId] = $bpNodeId;
+                                                
+                                                if ($bpExists) {
+                                                    $edges[] = [
+                                                        'from' => $declarationNodeId,
+                                                        'to' => $bpNodeId,
+                                                        'relation' => 'num_declaration',
+                                                        'type' => 'has_bon_provisoire'
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Déclaration manquante
+                            $declarationMissingNodeId = "declaration_missing_{$manifesteId}";
+                            if (!in_array($declarationMissingNodeId, $processedNodes)) {
+                                $nodes[] = [
+                                    'id' => $declarationMissingNodeId,
+                                    'type' => 'Declaration',
+                                    'label' => 'Déclaration manquante',
+                                    'count' => 0,
+                                    'ulid' => null,
+                                    'color' => $this->calculateNodeColor('Declaration', false, $declarationReferenceDate)
+                                ];
+                                $processedNodes['declaration_missing_' . $manifesteId] = $declarationMissingNodeId;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Déclarations liées directement à la FDI (via NUM_FDI) - selon s360_analyse
+        $declarationsDirectes = DeclarationSg::where('num_fdi', $fdi->numero_fdi)->get();
+        foreach ($declarationsDirectes as $declaration) {
+            $declarationId = $declaration->ulid ?? $declaration->id;
+            $declarationNodeId = "declaration_{$declarationId}";
+            if (!in_array($declarationNodeId, $processedNodes)) {
+                $declarationReferenceDate = $fdiReferenceDate; // Date de référence = date FDI
                 $nodes[] = [
                     'id' => $declarationNodeId,
                     'type' => 'Declaration',
-                    'label' => $declaration ? $declaration->declaration : 'Déclaration manquante',
-                    'count' => $declarationExists ? 1 : 0,
-                    'ulid' => $declaration ? ($declaration->ulid ?? null) : null,
-                    'color' => $this->calculateNodeColor('Declaration', $declarationExists, $declarationReferenceDate)
+                    'label' => $declaration->declaration,
+                    'count' => 1,
+                    'ulid' => $declaration->ulid ?? null,
+                    'color' => $this->calculateNodeColor('Declaration', true, $declarationReferenceDate)
                 ];
+                $processedNodes['declaration_' . $declarationId] = $declarationNodeId;
                 
-                if ($manifesteExists && $declarationExists) {
-                    $edges[] = [
-                        'from' => $manifesteNodeId,
-                        'to' => $declarationNodeId,
-                        'relation' => 'num_manifeste',
-                        'type' => 'has_declaration'
-                    ];
-                }
+                $edges[] = [
+                    'from' => $fdiNodeId,
+                    'to' => $declarationNodeId,
+                    'relation' => 'num_fdi',
+                    'type' => 'has_declaration'
+                ];
             }
         }
 

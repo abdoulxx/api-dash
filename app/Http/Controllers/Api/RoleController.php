@@ -12,11 +12,68 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use App\Models\Role;
 use App\Support\CacheTagger;
+use OpenApi\Annotations as OA;
 
+/**
+ * @OA\Tag(
+ *     name="Roles",
+ *     description="Gestion complete des roles : CRUD, options, restauration et suppression definitive."
+ * )
+ */
 class RoleController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/roles",
+     *     summary="Lister les roles",
+     *     description="Recupere une liste paginee des roles avec possibilite de recherche par nom et description.",
+     *     operationId="listRoles",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom et description",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des roles",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="10 role(s) disponible(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=2),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=10)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -58,7 +115,33 @@ class RoleController extends Controller
     }
 
     /**
-     * Get all roles with minimal data for dropdowns
+     * @OA\Get(
+     *     path="/api/roles/options/list",
+     *     summary="Lister les roles pour selection",
+     *     description="Recupere tous les roles avec des donnees minimales (id, name, description) pour les menus deroulants et selections.",
+     *     operationId="getRoleOptions",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des roles pour selection",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="10 role(s) disponible(s) pour selection"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="admin"),
+     *                     @OA\Property(property="description", type="string", example="Administrateur du systeme", nullable=true)
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function getOptions(): JsonResponse
     {
@@ -86,7 +169,35 @@ class RoleController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/roles",
+     *     summary="Creer un nouveau role",
+     *     description="Cree un nouveau role avec les informations fournies. Les permissions peuvent etre assignees via permissions (array).",
+     *     operationId="createRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name"},
+     *             @OA\Property(property="name", type="string", example="editor", description="Nom unique du role"),
+     *             @OA\Property(property="description", type="string", example="Editeur de contenu", nullable=true),
+     *             @OA\Property(property="guard_name", type="string", example="web", default="web", nullable=true),
+     *             @OA\Property(property="permissions", type="array", @OA\Items(type="string"), example={"view posts", "edit posts"}, description="Tableau de noms de permissions", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Role cree avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=201),
+     *             @OA\Property(property="message", type="string", example="Le role editor a ete cree avec 5 permission(s)"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function store(StoreRoleRequest $request): JsonResponse
     {
@@ -124,7 +235,39 @@ class RoleController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/roles/{id}",
+     *     summary="Afficher un role",
+     *     description="Recupere les details complets d un role, incluant ses permissions. Supporte deux formats de permissions : flat (par defaut) ou hierarchical.",
+     *     operationId="showRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="permissions_format",
+     *         in="query",
+     *         description="Format des permissions (flat ou hierarchical)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"flat", "hierarchical"}, default="flat")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Details du role",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Role admin charge (15 permission(s))"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role non trouve")
+     * )
      */
     public function show(int $id): JsonResponse
     {
@@ -186,7 +329,41 @@ class RoleController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/roles/{id}",
+     *     summary="Modifier un role",
+     *     description="Met a jour les informations d un role. Les permissions peuvent etre mises a jour via permissions (array) qui remplace les permissions existantes.",
+     *     operationId="updateRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string", example="editor", nullable=true),
+     *             @OA\Property(property="description", type="string", example="Editeur de contenu", nullable=true),
+     *             @OA\Property(property="permissions", type="array", @OA\Items(type="string"), example={"view posts", "edit posts"}, description="Tableau de noms de permissions pour remplacer les permissions existantes", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Role modifie avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Le role editor a ete mis a jour (8 permission(s))"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role non trouve"),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function update(UpdateRoleRequest $request, int $id): JsonResponse
     {
@@ -227,7 +404,31 @@ class RoleController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/roles/{id}",
+     *     summary="Supprimer un role (soft delete)",
+     *     description="Supprime un role de maniere logique (soft delete). Le role peut etre restaure ulterieurement.",
+     *     operationId="deleteRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Role supprime avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Le role editor a ete supprime (peut etre restaure)")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role non trouve")
+     * )
      */
     public function destroy(int $id): JsonResponse
     {
@@ -250,7 +451,57 @@ class RoleController extends Controller
     }
 
     /**
-     * Get trashed (soft deleted) roles
+     * @OA\Get(
+     *     path="/api/roles/trashed/list",
+     *     summary="Lister les roles supprimes",
+     *     description="Recupere une liste paginee des roles supprimes (soft delete) avec possibilite de recherche.",
+     *     operationId="listTrashedRoles",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numero de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d elements par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom et description",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginee des roles supprimes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="3 role(s) supprime(s) trouve(s)"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(type="object")
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=1),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=3)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function trashed(Request $request): JsonResponse
     {
@@ -294,7 +545,32 @@ class RoleController extends Controller
     }
 
     /**
-     * Restore a soft deleted role
+     * @OA\Post(
+     *     path="/api/roles/{role}/restore",
+     *     summary="Restaurer un role supprime",
+     *     description="Restaure un role qui a ete supprime (soft delete).",
+     *     operationId="restoreRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role a restaurer",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Role restaure avec succes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Le role editor a ete restaure avec succes (5 permission(s))"),
+     *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role supprime non trouve")
+     * )
      */
     public function restore(int $id): JsonResponse
     {
@@ -321,7 +597,31 @@ class RoleController extends Controller
     }
 
     /**
-     * Permanently delete a role (force delete)
+     * @OA\Delete(
+     *     path="/api/roles/{role}/force",
+     *     summary="Supprimer definitivement un role",
+     *     description="Supprime definitivement un role de la base de donnees. Cette action est irreversible. Le role doit etre deja supprime (soft delete) pour pouvoir etre supprime definitivement.",
+     *     operationId="forceDeleteRole",
+     *     tags={"Roles"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="path",
+     *         required=true,
+     *         description="ID du role a supprimer definitivement",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Role supprime definitivement",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Le role editor a ete supprime definitivement")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Role supprime non trouve")
+     * )
      */
     public function forceDelete(int $id): JsonResponse
     {

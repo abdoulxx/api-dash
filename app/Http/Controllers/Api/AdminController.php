@@ -14,11 +14,68 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use App\Support\CacheTagger;
+use OpenApi\Annotations as OA;
 
+/**
+ * @OA\Tag(
+ *     name="Administration",
+ *     description="Gestion des administrateurs du système."
+ * )
+ */
 class AdminController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/admins",
+     *     summary="Lister les administrateurs",
+     *     description="Récupère une liste paginée des administrateurs avec possibilité de recherche par nom, prénom, nom de famille et email.",
+     *     operationId="listAdmins",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numéro de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d'éléments par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom, prénom, nom de famille et email",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginée des administrateurs",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="5 administrateur(s) trouve(s)"),
+             *             @OA\Property(
+             *                 property="data",
+             *                 type="array",
+             *                 @OA\Items(type="object")
+             *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=2),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=5)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -63,7 +120,45 @@ class AdminController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/admins",
+     *     summary="Créer un nouvel administrateur",
+     *     description="Crée un nouvel administrateur avec les informations fournies. Le mot de passe est hashé automatiquement. Le flag is_admin est automatiquement défini à true. Les rôles peuvent être assignés via role (string) ou roles (array).",
+     *     operationId="createAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"firstname", "lastname", "email", "password", "password_confirmation"},
+     *             @OA\Property(property="firstname", type="string", example="Admin", description="Prénom"),
+     *             @OA\Property(property="lastname", type="string", example="Principal", description="Nom de famille"),
+     *             @OA\Property(property="name", type="string", example="Admin Principal", description="Nom complet généré automatiquement si non fourni"),
+     *             @OA\Property(property="email", type="string", format="email", example="admin@example.com"),
+     *             @OA\Property(property="password", type="string", format="password", example="password123", minLength=6),
+     *             @OA\Property(property="password_confirmation", type="string", format="password", example="password123", minLength=6),
+     *             @OA\Property(property="statut", type="string", enum={"Actif", "Inactif", "En attente"}, example="Actif", description="Statut par défaut: Actif"),
+     *             @OA\Property(property="fonction", type="string", example="Administrateur système", nullable=true),
+     *             @OA\Property(property="departement", type="string", example="IT", nullable=true),
+     *             @OA\Property(property="phone", type="string", example="+33123456789", nullable=true),
+     *             @OA\Property(property="address", type="string", example="123 Rue Example, Paris", nullable=true),
+     *             @OA\Property(property="roles", type="array", @OA\Items(type="string"), example={"super-admin", "admin"}, description="Tableau de noms de rôles", nullable=true),
+     *             @OA\Property(property="role", type="string", example="super-admin", description="Nom d'un seul rôle (alternative à roles)", nullable=true),
+     *             @OA\Property(property="is_active", type="boolean", example=true, description="Synchronisé avec statut si non fourni", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Administrateur créé avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=201),
+     *             @OA\Property(property="message", type="string", example="L administrateur Admin Principal a ete cree avec succes (2 role(s) assigne(s))"),
+             *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function store(StoreUserRequest $request): JsonResponse
     {
@@ -127,7 +222,32 @@ class AdminController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/admins/{id}",
+     *     summary="Afficher un administrateur",
+     *     description="Récupère les détails complets d'un administrateur, incluant ses rôles et permissions.",
+     *     operationId="showAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Détails de l'administrateur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Administrateur Admin Principal recupere (2 role(s))"),
+             *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur non trouvé")
+     * )
      */
     public function show(string $id): JsonResponse
     {
@@ -151,7 +271,51 @@ class AdminController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/admins/{id}",
+     *     summary="Modifier un administrateur",
+     *     description="Met à jour les informations d'un administrateur. Le mot de passe est hashé automatiquement s'il est fourni. Les rôles peuvent être mis à jour via roles (array).",
+     *     operationId="updateAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="firstname", type="string", example="Admin", nullable=true),
+     *             @OA\Property(property="lastname", type="string", example="Principal", nullable=true),
+     *             @OA\Property(property="name", type="string", example="Admin Principal", nullable=true),
+     *             @OA\Property(property="email", type="string", format="email", example="admin@example.com", nullable=true),
+     *             @OA\Property(property="password", type="string", format="password", example="newpassword123", minLength=6, nullable=true),
+     *             @OA\Property(property="password_confirmation", type="string", format="password", example="newpassword123", minLength=6, nullable=true),
+     *             @OA\Property(property="statut", type="string", enum={"Actif", "Inactif", "En attente"}, example="Actif", nullable=true),
+     *             @OA\Property(property="fonction", type="string", example="Administrateur système", nullable=true),
+     *             @OA\Property(property="departement", type="string", example="IT", nullable=true),
+     *             @OA\Property(property="phone", type="string", example="+33123456789", nullable=true),
+     *             @OA\Property(property="address", type="string", example="123 Rue Example, Paris", nullable=true),
+     *             @OA\Property(property="roles", type="array", @OA\Items(type="string"), example={"super-admin"}, description="Tableau de noms de rôles pour remplacer les rôles existants", nullable=true),
+     *             @OA\Property(property="is_active", type="boolean", example=true, nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Administrateur modifié avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L administrateur Admin Principal a ete modifie avec succes (3 champ(s) mis a jour)"),
+             *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur non trouvé"),
+     *     @OA\Response(response=422, description="Erreur de validation")
+     * )
      */
     public function update(UpdateUserRequest $request, string $id): JsonResponse
     {
@@ -192,7 +356,31 @@ class AdminController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/admins/{id}",
+     *     summary="Supprimer un administrateur (soft delete)",
+     *     description="Supprime un administrateur de manière logique (soft delete). L'administrateur peut être restauré ultérieurement.",
+     *     operationId="deleteAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Administrateur supprimé avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L administrateur Admin Principal a ete supprime (peut etre restaure)")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur non trouvé")
+     * )
      */
     public function destroy(string $id): JsonResponse
     {
@@ -215,7 +403,57 @@ class AdminController extends Controller
     }
 
     /**
-     * Liste les administrateurs supprimés (soft delete)
+     * @OA\Get(
+     *     path="/api/admins/trashed/list",
+     *     summary="Lister les administrateurs supprimés",
+     *     description="Récupère une liste paginée des administrateurs supprimés (soft delete) avec possibilité de recherche.",
+     *     operationId="listTrashedAdmins",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Numéro de page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d'éléments par page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, maximum=100)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Recherche dans nom, prénom, nom de famille et email",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste paginée des administrateurs supprimés",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="2 administrateur(s) supprime(s) trouve(s)"),
+             *             @OA\Property(
+             *                 property="data",
+             *                 type="array",
+             *                 @OA\Items(type="object")
+             *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=1),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=2)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function trashed(Request $request): JsonResponse
     {
@@ -254,7 +492,32 @@ class AdminController extends Controller
     }
 
     /**
-     * Restaurer un administrateur supprimé
+     * @OA\Post(
+     *     path="/api/admins/{id}/restore",
+     *     summary="Restaurer un administrateur supprimé",
+     *     description="Restaure un administrateur qui a été supprimé (soft delete).",
+     *     operationId="restoreAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur à restaurer",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Administrateur restauré avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L administrateur Admin Principal a ete restaure avec succes"),
+             *             @OA\Property(property="data", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur supprimé non trouvé")
+     * )
      */
     public function restore(string $id): JsonResponse
     {
@@ -276,7 +539,31 @@ class AdminController extends Controller
     }
 
     /**
-     * Supprimer définitivement un administrateur
+     * @OA\Delete(
+     *     path="/api/admins/{id}/force",
+     *     summary="Supprimer définitivement un administrateur",
+     *     description="Supprime définitivement un administrateur de la base de données. Cette action est irréversible. L'administrateur doit être déjà supprimé (soft delete) pour pouvoir être supprimé définitivement.",
+     *     operationId="forceDeleteAdmin",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur à supprimer définitivement",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Administrateur supprimé définitivement",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="L administrateur Admin Principal a ete supprime definitivement")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur supprimé non trouvé")
+     * )
      */
     public function forceDelete(string $id): JsonResponse
     {
@@ -299,7 +586,60 @@ class AdminController extends Controller
     }
 
     /**
-     * Get admin photo
+     * @OA\Get(
+     *     path="/api/admins/{id}/photo",
+     *     summary="Récupérer la photo de profil d'un administrateur",
+     *     description="Récupère l'URL de la photo de profil d'un administrateur si elle existe.",
+     *     operationId="getAdminPhoto",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil récupérée avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="Photo de profil de l administrateur Admin Principal recuperee avec succes"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="has_photo", type="boolean", example=true),
+     *                 @OA\Property(property="photo", type="string", example="http://localhost:8000/storage/admins/photos/photo.jpg"),
+     *                 @OA\Property(property="photo_path", type="string", example="admins/photos/photo.jpg"),
+     *                 @OA\Property(
+     *                     property="admin",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="string", example="01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+     *                     @OA\Property(property="name", type="string", example="Admin Principal"),
+     *                     @OA\Property(property="email", type="string", example="admin@example.com")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Photo non trouvée",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=404),
+     *             @OA\Property(property="message", type="string", example="Aucune photo de profil trouvee pour l administrateur Admin Principal"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="has_photo", type="boolean", example=false),
+     *                 @OA\Property(property="photo", type="string", nullable=true, example=null),
+     *                 @OA\Property(property="photo_url", type="string", nullable=true, example=null)
+     *             )
+     *         )
+     *     )
+     * )
      */
     public function getPhoto(string $id): JsonResponse
     {
@@ -350,7 +690,62 @@ class AdminController extends Controller
     }
 
     /**
-     * Upload or update admin photo
+     * @OA\Post(
+     *     path="/api/admins/{id}/photo",
+     *     summary="Télécharger ou mettre à jour la photo de profil d'un administrateur",
+     *     description="Télécharge ou remplace la photo de profil d'un administrateur. Formats acceptés: JPEG, PNG, JPG, GIF. Taille maximale: 2MB. L'ancienne photo est automatiquement supprimée si elle existe.",
+     *     operationId="uploadAdminPhoto",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 type="object",
+     *                 required={"photo"},
+     *                 @OA\Property(
+     *                     property="photo",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="Fichier image (JPEG, PNG, JPG, GIF, max 2MB)"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil mise à jour avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La photo de profil de l administrateur Admin Principal a ete mise a jour avec succes"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="photo", type="string", example="http://localhost:8000/storage/admins/photos/photo.jpg"),
+     *                 @OA\Property(property="photo_path", type="string", example="admins/photos/photo.jpg")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Administrateur non trouvé"),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=422),
+     *             @OA\Property(property="message", type="string", example="Le champ photo est requis. Aucun fichier n a ete recu.")
+     *         )
+     *     )
+     * )
      */
     public function uploadPhoto(Request $request, string $id): JsonResponse
     {
@@ -406,7 +801,39 @@ class AdminController extends Controller
     }
 
     /**
-     * Delete admin photo
+     * @OA\Delete(
+     *     path="/api/admins/{id}/photo",
+     *     summary="Supprimer la photo de profil d'un administrateur",
+     *     description="Supprime la photo de profil d'un administrateur. Le fichier est supprimé du stockage et la référence dans la base de données est effacée.",
+     *     operationId="deleteAdminPhoto",
+     *     tags={"Administration"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ULID de l'administrateur",
+     *         @OA\Schema(type="string", pattern="^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Photo de profil supprimée avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=200),
+     *             @OA\Property(property="message", type="string", example="La photo de profil de l administrateur Admin Principal a ete supprimee avec succes")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Photo non trouvée",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="status", type="integer", example=404),
+     *             @OA\Property(property="message", type="string", example="Aucune photo de profil trouvee pour l administrateur Admin Principal")
+     *         )
+     *     )
+     * )
      */
     public function deletePhoto(string $id): JsonResponse
     {
